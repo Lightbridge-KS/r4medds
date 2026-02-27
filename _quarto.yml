@@ -1,0 +1,43 @@
+project:
+  type: book
+
+book:
+  title: "R for Medical Data Analysis"
+  subtitle: "An Introductory Guide for Healthcare Professionals"
+  author: "Kittipos Sirivongrungson"
+  date: today
+  repo-url: https://github.com/Lightbridge-KS/r4medds
+  site-url: https://r4medds.netlify.app
+  repo-actions: [edit, issue]
+  chapters:
+    - index.qmd
+    - contents/chapters/01-setup.qmd
+    - contents/chapters/02-rstudio-tour.qmd
+    - references.qmd
+
+bibliography: references.bib
+
+format:
+  html:
+    theme:
+      light:
+      - cosmo
+      - brand
+      dark:
+      - darkly
+    toc-depth: 4
+    code-link: true
+    code-copy: true
+    code-tools: true
+    lightbox: true
+
+freeze: auto
+
+execute:
+  warning: false
+  message: false
+
+knitr:
+  opts_chunk:
+    R.options:
+      dplyr.summarise.inform: false

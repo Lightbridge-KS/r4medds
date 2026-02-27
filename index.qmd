@@ -1,0 +1,117 @@
+# Preface {.unnumbered}
+
+Welcome to *R for Medical Data Analysis*. This book is a practical, hands-on guide to learning R for data analysis --- written specifically for healthcare professionals.
+
+Whether you're a doctor wanting to analyze your research data, a nurse exploring patient outcomes, or a medical student curious about data science, this book will take you from zero programming experience to confidently working with clinical datasets in R.
+
+## Who This Book Is For
+
+This book is for **healthcare professionals** who want to learn data analysis with R. You might be:
+
+- A physician who wants to move beyond Excel for research data
+- A medical resident preparing to analyze data for a thesis
+- A nurse or allied health professional exploring patient outcomes
+- A researcher who wants reproducible, transparent analysis workflows
+
+**No prior programming experience is assumed.** If you can use a spreadsheet, you can learn R. Some familiarity with data (rows, columns, variables) is helpful but not required --- we'll cover everything from scratch.
+
+This book originated as material for a 1-day onsite workshop, but it is designed as a **standalone, self-paced resource**. You can work through it at your own speed, revisiting chapters as needed.
+
+## What You Will Learn
+
+This book covers the essential skills for data analysis with R:
+
+- **R programming fundamentals** --- variables, data types, vectors, functions, and pipes
+- **Data wrangling** --- importing, cleaning, filtering, and transforming data with the Tidyverse
+- **Data visualization** --- creating publication-quality plots with ggplot2
+- **Basic statistics** --- descriptive statistics, hypothesis tests, and publication-ready tables
+- **Reproducible reports** --- combining code, text, and output with Quarto
+- **LLM integration** --- using Large Language Models from R to augment your data workflows
+
+> By the end of this book, you will be able to import a clinical dataset, clean it, create publication-quality tables and figures, run basic statistical tests, and generate a reproducible report --- all in R.
+
+## How This Book Is Organized
+
+The book is organized into three main parts, preceded by a setup guide and a motivation chapter:
+
+- **Chapter 0: Setup & Installation** --- get your R environment ready
+- **Chapter 1: Why R?** --- motivation for learning R as a healthcare professional
+
+**Part 1: R Programming (Chapters 2--3)**
+:   The foundations --- data types, vectors, functions, pipes, data frames, and tibbles.
+
+**Part 2: Data Analysis with Tidyverse (Chapters 4--8)**
+:   The core skills --- importing data, wrangling with dplyr, tidying with tidyr, visualization with ggplot2, and basic statistics with gtsummary.
+
+**Part 3: Beyond the Basics (Chapters 9--11)**
+:   Reproducible reports with Quarto, using LLMs from R, and a roadmap for continued learning.
+
+The chapters are designed to be read **sequentially**, as each builds on the previous. After your first read-through, the book can serve as a reference you return to for specific topics.
+
+## About the Author
+
+I'm a diagnostic radiologist working in a specialized AI unit in the radiology department. R was my first programming language --- I started learning it about five years ago while working as an assistant professor in a Physiology department, motivated by wanting a coding skill that could be applied directly in the medical domain.
+
+I built my foundation through two excellent books: *Hands-On Programming with R* and *R for Data Science*. Exploring the Tidyverse ecosystem taught me not just how to code, but how to *think about data*. The Tidyverse's design philosophy --- clear, composable functions that read like English --- remains one of the best-designed data science frameworks I've encountered.
+
+Over the years, I've used R for research and non-research data analysis, machine learning (with Tidymodels), building websites and blogs (Shiny, Quarto), and creating R packages. I then transitioned through a Diagnostic Radiology residency program and expanded into Python, Flutter, and C# --- becoming more of a software engineer along the way.
+
+My vision for this book is to share what I've learned and inspire other healthcare professionals to discover the power of programming for their work.
+
+## Conventions Used in This Book
+
+### Code Blocks
+
+Throughout this book, R code is shown in gray boxes. The output appears directly below:
+
+```{r}
+1 + 1
+```
+
+When you see a code block like this, try running it yourself in RStudio to build your intuition.
+
+### Callout Blocks
+
+We use four types of callout blocks to highlight important information:
+
+::: {.callout-tip}
+## Tip
+Tips highlight best practices, useful shortcuts, and advice that will save you time.
+:::
+
+::: {.callout-note}
+## Note
+Notes provide additional context, background information, or interesting details.
+:::
+
+::: {.callout-warning}
+## Warning
+Warnings flag common mistakes and pitfalls to avoid.
+:::
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Some chapters include optional **Python comparison** callouts like this one. They are **collapsible** --- click to expand. These show the equivalent Python syntax side-by-side with R, for readers who are curious or come from a Python background.
+
+For example, to create a variable:
+
+- **R:** `x <- 42`
+- **Python:** `x = 42`
+
+You can safely skip these callouts if you're not interested in Python.
+:::
+
+### Exercises
+
+Most chapters end with exercises to practice what you've learned. Solutions are provided in Appendix C. We encourage you to attempt the exercises before checking the solutions!
+
+### Datasets
+
+All datasets used in this book are either loaded from R packages or bundled as CSV files in the `data/` folder. You don't need to download anything separately.
+
+## Recommended References {.unnumbered}
+
+This book is self-contained, but if you want to go deeper, these are excellent resources:
+
+- [**Hands-On Programming with R**](https://rstudio-education.github.io/hopr/) by Garrett Grolemund --- beginner-friendly; learn R by building projects.
+- [**R for Data Science (2e)**](https://r4ds.hadley.nz) by Hadley Wickham, Mine Cetinkaya-Rundel, and Garrett Grolemund --- the classic Tidyverse reference.
+- [**Reproducible Medical Research with R**](https://bookdown.org/pdr_higgins/rmrwr/) by Peter Higgins --- a medical-focused R book.
