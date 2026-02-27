@@ -13,6 +13,9 @@ book:
     - index.qmd
     - contents/chapters/01-setup.qmd
     - contents/chapters/02-rstudio-tour.qmd
+    - part: "Part 1: R Programming"
+      chapters:
+        - contents/chapters/03-r-programming.qmd
     - references.qmd
 
 bibliography: references.bib

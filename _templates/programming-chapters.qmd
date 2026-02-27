@@ -1,0 +1,147 @@
+---
+# Programming Chapter Template
+# ==============================
+# This template implements the pedagogical conventions from CLAUDE.md.
+# Use it as a starting point for chapters that teach programming concepts.
+#
+# Instructions:
+#   1. Copy this file to contents/chapters/XX-chapter-name.qmd
+#   2. Replace all [PLACEHOLDERS] with actual content
+#   3. Delete sections that don't apply
+#   4. Remove this YAML comment block
+---
+
+# [Chapter Title]
+
+[1-2 sentence intro: what the reader will learn and why it matters.]
+
+[Bridge from the previous chapter: "In the last chapter, we learned X. Now we'll learn Y, which lets us..."]
+
+::: {.callout-note}
+## Our running example: [Scenario name]
+
+[Describe the clinical/medical scenario that will thread through this chapter.
+Each section should apply its new concept to this same scenario, building
+in sophistication (spiral curriculum). Choose a scenario relevant to
+healthcare professionals.]
+:::
+
+
+## [Section 1: Simplest Concept]
+
+<!-- CONVENTION: Teach Before Use
+     Introduce concepts BEFORE they appear in code.
+     If a later section needs operator X, teach it here first. -->
+
+[Explain the concept in plain language, then show the general form.]
+
+[Simple, standalone example first — not the running example yet.]
+
+```{r}
+# [Simple example code]
+```
+
+[NOW connect to the running example:]
+
+```{r}
+# [Running example using this concept]
+```
+
+<!-- CONVENTION: Python Comparison (optional, at end of section) -->
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+[Side-by-side R vs Python for this concept.]
+
+```python
+# Python equivalent
+```
+:::
+
+
+## [Section 2: Build on Section 1]
+
+<!-- CONVENTION: Incremental Complexity
+     Introduce the simple form first, then extend.
+     Each form gets its own subsection with its own example. -->
+
+### [Simple form]
+
+[Explain and demonstrate the basic version.]
+
+```{r}
+# [Basic form with running example]
+```
+
+### [Extended form]
+
+[Now introduce the more complex version, building on what the reader just learned.]
+
+```{r}
+# [Extended form with running example]
+```
+
+
+## [Section N: New Syntax]
+
+<!-- CONVENTION: Explain Syntax Explicitly
+     When introducing new syntax, break it down with bullets. -->
+
+The syntax is:
+
+```r
+# [General syntax template]
+```
+
+Let's break this down:
+
+- **`part_1`** --- [what it does and why]
+- **`part_2`** --- [what it does and why]
+- **`part_3`** --- [what it does and why]
+
+[Example applying the syntax to the running example.]
+
+
+## [Section M: Category of Things]
+
+<!-- CONVENTION: Classify to Frame
+     Before details, give a mental model of the landscape. -->
+
+[Brief intro to the category.]
+
+| Category | Description | Example |
+|----------|-------------|---------|
+| **Type A** | [what it is] | `example_a()` |
+| **Type B** | [what it is] | `example_b()` |
+| **Type C** | [what it is] | `example_c()` |
+
+[Then teach each category in subsections below.]
+
+
+## Summary
+
+[Recap the journey: how the running example evolved from start to finish.]
+
+| Step | What we did | Concept learned |
+|------|-------------|-----------------|
+| 1 | [action] | [concept] |
+| 2 | [action] | [concept] |
+| ... | ... | ... |
+
+[Bridge to next chapter: "In the next chapter, we'll learn about..."]
+
+
+## Exercises {.unnumbered}
+
+<!-- Exercises should:
+     - Use DIFFERENT medical scenarios than the running example
+     - Cover key concepts from the chapter
+     - Progress from simple to challenging
+     - Solutions go in Appendix C -->
+
+1. **[Exercise name].** [Description using a medical context.]
+
+2. **[Exercise name].** [Description using a medical context.]
+
+3. **[Exercise name].** [Description — can involve writing a function or combining concepts.]
+
+4. **[Exercise name].** [Description — most challenging, combines multiple concepts.]

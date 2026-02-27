@@ -1,0 +1,1061 @@
+# R Programming Essentials
+
+In this chapter, you'll learn the core building blocks of R programming --- variables, data types, vectors, flow control, and functions. These are the tools you'll use throughout the rest of this book.
+
+To make these concepts concrete, we'll use a **running clinical example** that builds from section to section.
+
+::: {.callout-note}
+## Our running example: Estimating kidney function
+
+Throughout this chapter, we'll progressively build up a calculation using the **Cockcroft-Gault equation** --- a widely used formula for estimating creatinine clearance (a measure of kidney function):
+
+$$
+eCrCl = \frac{(140 - age) \times weight_{kg}}{72 \times Cr_{mg/dL}} \times (0.85 \text{ if female})
+$$
+
+Starting from simple arithmetic, we'll add variables, handle multiple patients, classify results into CKD stages, and finally wrap everything into a reusable function. Each section introduces a new R concept and applies it to this scenario.
+:::
+
+
+## R as a Calculator
+
+At its core, R is a powerful calculator. Type a mathematical expression, and R gives you the answer:
+
+```{r}
+2 + 3
+```
+
+
+```{r}
+100 / 3
+```
+
+```{r}
+2^10
+```
+
+Here are R's arithmetic operators:
+
+| Operator | Meaning          | Example   |
+|----------|------------------|-----------|
+| `+`      | Addition         | `5 + 3`   |
+| `-`      | Subtraction      | `10 - 4`  |
+| `*`      | Multiplication   | `6 * 7`   |
+| `/`      | Division         | `100 / 3` |
+| `^`      | Exponent (power) | `2 ^ 3`   |
+
+Like in mathematics, **parentheses** control the order of operations:
+
+```{r}
+(2 + 3) * 4
+```
+
+```{r}
+2 + 3 * 4      # without parentheses: multiplication first
+```
+
+::: {.callout-note collapse="true"}
+## A note about `print()`
+Unlike other programming language, In R, when you type an expression in the **Console**, an **R Script** (run line-by-line), or a **Quarto code chunk**, R automatically prints the result. You don't need to wrap it in `print()` --- just write the expression and R will display the output. This is called **auto-printing**, and it's why `2 + 3` shows `5` without us writing `print(2 + 3)`.
+:::
+
+### Your first clinical calculation
+
+Let's try something more relevant. The Cockcroft-Gault equation for a 55-year-old male patient weighing 70 kg with a serum creatinine of 1.2 mg/dL:
+
+```{r}
+(140 - 55) * 70 / (72 * 1.2)
+```
+
+An estimated creatinine clearance of about 69 mL/min. But typing raw numbers like this is hard to read and easy to get wrong. Let's fix that with **variables**.
+
+
+## Variables and Assignment
+
+A **variable** stores a value so you can use it later by name. In R, you create variables with the **assignment operator** `<-`:
+
+```{r}
+age <- 55
+```
+
+This stores the number `55` in a variable called `age`. You can now use `age` anywhere in place of `55`:
+
+```{r}
+age
+```
+
+```{r}
+140 - age
+```
+
+::: {.callout-tip}
+## The `<-` shortcut
+In RStudio, press **Alt + -** (Windows/Linux) or **Option + -** (macOS) to type `<-`. You'll use this thousands of times --- it's worth memorizing.
+:::
+
+::: {.callout-note}
+## What about `=`?
+You may see `=` used for assignment in some R code (e.g., `age = 55`). It works in most situations, but `<-` is the **standard convention** in the R community and is what you'll see in virtually all R books, packages, and style guides. We'll use `<-` throughout this book.
+:::
+
+### Naming conventions
+
+Variable names should be descriptive. R convention is **snake_case** --- lowercase words separated by underscores:
+
+| Good names         | Bad names    | Why bad?                     |
+|--------------------|--------------|------------------------------|
+| `age`              | `a`          | Not descriptive              |
+| `weight_kg`        | `Weight.KG`  | Inconsistent casing          |
+| `serum_creatinine` | `x1`         | Meaningless name             |
+| `patient_count`    | `myVar`      | Vague, camelCase not standard |
+
+::: {.callout-warning}
+## Naming rules
+Variable names must start with a letter and can contain letters, numbers, underscores (`_`), and dots (`.`). They are **case-sensitive** --- `Age` and `age` are different variables. Avoid spaces and special characters.
+:::
+
+### Building the eGFR calculation with variables
+
+Let's store our patient's data in properly named variables:
+
+```{r}
+age        <- 55
+weight_kg  <- 70
+creatinine <- 1.2    # serum creatinine in mg/dL
+sex        <- "Male"
+```
+
+Now the Cockcroft-Gault calculation becomes readable:
+
+```{r}
+egfr <- (140 - age) * weight_kg / (72 * creatinine)
+egfr
+```
+
+Much better. Each number has a name, and if you need to change a value (say, a different patient's age), you only change it in one place.
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+In Python, `=` is the only assignment operator:
+
+```python
+age = 55
+weight_kg = 70
+creatinine = 1.2
+sex = "Male"
+```
+
+Both R and Python use `snake_case` as the preferred naming convention.
+:::
+
+
+## Data Types
+
+Every value in R has a **type**. Understanding types helps you avoid errors and work with data correctly.
+
+R has four basic types you'll encounter regularly:
+
+| Type        | Stores           | Examples                 |
+|-------------|------------------|--------------------------|
+| `numeric`   | Numbers          | `3.14`, `42`, `-7.5`    |
+| `character` | Text (strings)   | `"hello"`, `"Male"`     |
+| `logical`   | True / False     | `TRUE`, `FALSE`          |
+| `factor`    | Categories       | *(covered in next chapter)* |
+
+### Numeric
+
+Numbers are the most common type. R stores most numbers as **doubles** (decimal numbers):
+
+```{r}
+typeof(age)
+```
+
+```{r}
+typeof(creatinine)
+```
+
+Even `55` (a whole number) is stored as a double internally.
+
+### Character
+
+Text values are called **character** strings. They must be wrapped in quotes (`"` or `'`):
+
+```{r}
+sex <- "Male"
+diagnosis <- "Chronic Kidney Disease"
+typeof(sex)
+```
+
+### Logical
+
+Logical values are either `TRUE` or `FALSE`. They often come from comparisons:
+
+```{r}
+is_impaired <- egfr < 60
+is_impaired
+```
+
+```{r}
+typeof(is_impaired)
+```
+
+Our patient's eGFR of ~69 is not below 60, so `is_impaired` is `FALSE`.
+
+### Checking types
+
+Use `class()` for a quick type check:
+
+```{r}
+class(age)
+class(sex)
+class(is_impaired)
+```
+
+::: {.callout-note}
+## What about factors?
+A **factor** is a special type for categorical data (like blood group: A, B, AB, O). We'll explore factors in the next chapter when we work with data frames. For now, just know they exist.
+:::
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python's type names differ slightly:
+
+| R           | Python        | Example          |
+|-------------|---------------|------------------|
+| `numeric`   | `int`/`float` | `42`, `3.14`     |
+| `character` | `str`         | `"hello"`        |
+| `logical`   | `bool`        | `True`, `False`  |
+
+Note: Python booleans are capitalized (`True`/`False`) but not all-caps like R's `TRUE`/`FALSE`.
+
+```python
+type(42)       # <class 'int'>
+type("Male")   # <class 'str'>
+type(True)     # <class 'bool'>
+```
+:::
+
+
+## Vectors
+
+A **vector** is R's fundamental data structure --- an ordered collection of values of the same type. Almost everything in R is a vector; even a single number like `42` is a vector of length 1.
+
+### Creating vectors
+
+Use `c()` (short for **c**ombine) to create a vector:
+
+```{r}
+ages <- c(55, 70, 45, 62, 38)
+ages
+```
+
+```{r}
+sexes <- c("Male", "Female", "Male", "Female", "Male")
+sexes
+```
+
+The **`:`** operator creates a sequence of integers --- useful for generating regular number sequences without typing each one:
+
+```{r}
+1:5
+```
+
+```{r}
+10:15
+```
+
+### Indexing or Subsetting
+
+Access elements by position using square brackets `[]`. **R uses 1-based indexing** --- the first element is `[1]`:
+
+```{r}
+ages[1]      # first patient
+```
+
+```{r}
+ages[2:4]    # patients 2 through 4
+```
+
+```{r}
+ages[-1]     # all EXCEPT the first
+```
+
+### Vectorized operations --- R's superpower
+
+This is one of R's most powerful features: operations apply to **every element at once**, without needing a loop.
+
+```{r}
+ages + 10    # add 10 to every age
+```
+
+Let's use this to compute eGFR for five patients simultaneously:
+
+```{r}
+# Five clinic patients
+ages         <- c(55, 70, 45, 62, 38)
+weights      <- c(70, 58, 82, 65, 90)
+creatinines  <- c(1.2, 1.8, 0.9, 2.1, 1.0)
+```
+
+```{r}
+# Calculate eGFR for ALL patients at once (without sex adjustment for now)
+egfrs <- (140 - ages) * weights / (72 * creatinines)
+egfrs
+```
+
+One line of code --- five eGFR results. No loops needed. We'll add the sex adjustment factor later when we learn about functions.
+
+::: {.callout-tip}
+## Why vectorization matters
+In many languages, you'd write a `for` loop to process each patient one at a time. R's vectorized operations are not only more concise --- they're also **faster**, because R optimizes the computation internally.
+:::
+
+### Summary functions
+
+R provides built-in functions to summarize vectors:
+
+```{r}
+mean(egfrs)      # average eGFR
+```
+
+```{r}
+median(egfrs)
+```
+
+```{r}
+min(egfrs)
+max(egfrs)
+```
+
+```{r}
+length(egfrs)    # how many patients
+```
+
+```{r}
+round(egfrs, 1)  # round to 1 decimal place
+```
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+R vectors and Python lists look similar but behave differently:
+
+```python
+# Python list — NOT vectorized by default
+ages = [55, 70, 45, 62, 38]
+ages + 10        # TypeError!
+ages[0]          # 55 — 0-based indexing!
+
+# For vectorized operations, use NumPy
+import numpy as np
+ages = np.array([55, 70, 45, 62, 38])
+ages + 10        # array([65, 80, 55, 72, 48])
+```
+
+Key difference: **R is 1-based** (`ages[1]` is the first), **Python is 0-based** (`ages[0]` is the first).
+:::
+
+
+## Logical Operations and Comparisons
+
+Comparisons produce logical values (`TRUE` / `FALSE`). These are essential for filtering and classifying data.
+
+### Comparison operators
+
+| Operator | Meaning            | Example   |
+|----------|--------------------|-----------|
+| `==`     | Equal to           | `x == 5`  |
+| `!=`     | Not equal to       | `x != 5`  |
+| `>`      | Greater than       | `x > 5`   |
+| `<`      | Less than          | `x < 5`   |
+| `>=`     | Greater or equal   | `x >= 5`  |
+| `<=`     | Less than or equal | `x <= 5`  |
+
+::: {.callout-warning}
+## `==` for comparison, `<-` for assignment
+Use `==` to **test** equality ("is this equal to?") and `<-` to **assign** a value ("store this"). Mixing them up is a common source of bugs.
+:::
+
+When applied to vectors, comparisons are **vectorized**:
+
+```{r}
+egfrs
+```
+
+```{r}
+# Which patients have impaired kidney function (eGFR < 60)?
+egfrs < 60
+```
+
+Two of our five patients have eGFR below 60.
+
+### Filtering with logical vectors
+
+You can use a logical vector to **subset** another vector --- extracting only the elements where the condition is `TRUE`:
+
+```{r}
+# Extract only the impaired eGFR values
+egfrs[egfrs < 60]
+```
+
+```{r}
+# What ages correspond to impaired kidneys?
+ages[egfrs < 60]
+```
+
+### Combining conditions
+
+Use `&` (AND), `|` (OR), and `!` (NOT) to combine conditions:
+
+```{r}
+# Patients older than 50 with eGFR < 60
+egfrs < 60 & ages > 50
+```
+
+### The `%in%` operator
+
+`%in%` checks whether values exist in a given set:
+
+```{r}
+blood_types <- c("A", "B", "O", "AB", "A")
+blood_types %in% c("A", "O")
+```
+
+### Counting with logical vectors
+
+A useful trick: `TRUE` counts as `1` and `FALSE` as `0`. This means `sum()` counts the `TRUE`s, and `mean()` gives the proportion:
+
+```{r}
+sum(egfrs < 60)     # how many patients have eGFR < 60?
+```
+
+```{r}
+mean(egfrs < 60)    # what proportion?
+```
+
+40% of our patients (2 out of 5) have eGFR below 60.
+
+
+## Missing Values (`NA`) {#sec-na}
+
+Real medical data is rarely complete. Lab results may be pending, forms may have blank fields, or data entry may have been skipped. R represents missing values as **`NA`** (Not Available).
+
+### `NA` is contagious
+
+Any calculation involving `NA` returns `NA` --- because if you don't know a value, you can't know the result:
+
+```{r}
+NA + 1
+```
+
+```{r}
+NA > 5
+```
+
+```{r}
+NA == NA
+```
+
+That last one may surprises you. `NA == NA` returns `NA` because: if you don't know what either value is, you can't tell whether they're equal.
+
+### Detecting missing values
+
+Use `is.na()` to test for `NA`:
+
+```{r}
+x <- c(10, NA, 30, NA, 50)
+is.na(x)
+```
+
+```{r}
+!is.na(x)    # the opposite: which are NOT missing?
+```
+
+### The `na.rm` argument
+
+Many summary functions return `NA` when the input contains missing values:
+
+```{r}
+# What if patient 3's creatinine result is pending?
+creatinines_with_na <- c(1.2, 1.8, NA, 2.1, 1.0)
+mean(creatinines_with_na)
+```
+
+The mean of "something unknown" is unknown. To skip the missing value, use `na.rm = TRUE` (**r**e**m**ove NAs):
+
+```{r}
+mean(creatinines_with_na, na.rm = TRUE)
+```
+
+Now R computes the mean of the four known values, ignoring the missing one.
+
+::: {.callout-tip}
+## `na.rm` is everywhere
+Most summary functions in R --- `mean()`, `sum()`, `median()`, `sd()`, `min()`, `max()` --- accept `na.rm = TRUE`. You'll use it frequently with real-world datasets.
+:::
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python uses `None` and `NaN` (Not a Number) for missing values:
+
+```python
+import numpy as np
+import pandas as pd
+
+x = [1, 2, None, 4]
+pd.isna(x)                     # like is.na()
+np.nanmean([1, 2, np.nan, 4])  # like mean(..., na.rm = TRUE)
+```
+
+Pandas DataFrames also provide `.dropna()` and `.fillna()` for handling missing data.
+:::
+
+
+## Flow Control {#sec-flow-control}
+
+Sometimes you need R to make decisions: "if the eGFR is above 90, classify as normal; otherwise, check the next threshold." This is **flow control**.
+
+### `if` / `else`
+
+The simplest form makes a **two-way decision**: do one thing if a condition is true, something else if it's false.
+
+```r
+if (condition) {
+  # do this when TRUE
+} else {
+  # do this when FALSE
+}
+```
+
+Let's check whether a patient's kidney function is impaired:
+
+```{r}
+patient_egfr <- 68.9
+
+if (patient_egfr < 60) {
+  status <- "Impaired"
+} else {
+  status <- "Normal"
+}
+
+status
+```
+
+Our patient's eGFR of 68.9 is not below 60, so the result is `"Normal"`.
+
+### `if` / `else if` / `else`
+
+When you have **more than two categories**, add `else if` branches. Each condition is checked in order --- R takes the **first** one that is `TRUE` and skips the rest.
+
+Let's classify kidney function into simplified CKD stages:
+
+```{r}
+patient_egfr <- 68.9
+
+if (patient_egfr >= 90) {
+  stage <- "G1 (Normal)"
+} else if (patient_egfr >= 60) {
+  stage <- "G2 (Mild decrease)"
+} else if (patient_egfr >= 30) {
+  stage <- "G3 (Moderate decrease)"
+} else {
+  stage <- "G4-G5 (Severe decrease)"
+}
+
+stage
+```
+
+The eGFR of 68.9 didn't satisfy `>= 90` (first branch), but it did satisfy `>= 60` (second branch), so R assigned `"G2 (Mild decrease)"` and stopped checking.
+
+::: {.callout-note}
+## Simplified CKD staging
+We're using a simplified 4-level classification for teaching purposes. The full [KDIGO staging system](https://kdigo.org/guidelines/ckd-evaluation-and-management/) divides kidney function into 6 stages (G1, G2, G3a, G3b, G4, G5).
+:::
+
+### Vectorized `ifelse()`
+
+The `if` / `else` statement works on a **single value**. For vectors, use `ifelse()`:
+
+```{r}
+# Classify all patients as "Impaired" or "Normal" at once
+ifelse(egfrs < 60, "Impaired", "Normal")
+```
+
+::: {.callout-tip}
+## When to use which?
+- **`if` / `else`** → for a **single** condition (one patient)
+- **`ifelse()`** → for a **vector** of values (multiple patients at once)
+
+In later chapters, we'll learn an even more powerful tool for multi-level classification: `dplyr::case_when()`.
+:::
+
+### `for` loops (brief)
+
+A `for` loop repeats an action for each element in a sequence:
+
+```{r}
+for (i in 1:3) {
+  cat("Patient", i, ": eGFR =", round(egfrs[i], 1), "\n")
+}
+```
+
+::: {.callout-note}
+## Loops are uncommon in idiomatic R
+You'll rarely write `for` loops in day-to-day R code. R's vectorized operations and the tidyverse functions we'll learn in later chapters handle most iteration more elegantly. We mention loops here so you recognize them, but don't worry if they feel unfamiliar.
+:::
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python uses indentation instead of braces for code blocks:
+
+```python
+# Python
+if egfr >= 90:
+    stage = "G1 (Normal)"
+elif egfr >= 60:
+    stage = "G2 (Mild decrease)"
+elif egfr >= 30:
+    stage = "G3 (Moderate decrease)"
+else:
+    stage = "G4-G5 (Severe decrease)"
+```
+
+Key differences: `elif` (not `else if`), colon `:` after each condition, and **indentation** defines the blocks (no `{}`).
+:::
+
+
+## Functions {#sec-functions}
+
+You've already been using functions throughout this chapter --- `mean()`, `round()`, `c()`, `is.na()`. A **function** takes inputs (called **arguments**), does something with them, and returns a result.
+
+```{mermaid}
+%%| label: fig-function-diagram
+%%| fig-cap: "How a function works: inputs go in, output comes out."
+flowchart LR
+  A["1.2, 1.8"] -->|input| B["mean()"]
+  B -->|output| C["1.5"]
+
+  D["68.865"] -->|input| E["round(, 1)"]
+  E -->|output| F["68.9"]
+```
+
+### Where do functions come from?
+
+Functions in R generally come from three sources:
+
+| Source | Examples | Documentation |
+|---|---|---|
+| **Base R** --- built into R itself | `mean()`, `round()`, `sum()`, `paste()` | Always available, no `library()` needed |
+| **R packages** --- installed add-ons (see more @sec-r-pkg) | `readr::read_csv()`, `dplyr::filter()` | Available after `library()` or via `::` |
+| **User-defined** --- written by you | `classify_ckd()`, `estimate_egfr()` | No built-in docs (unless you build a package) |
+
+Everything you've used so far --- `mean()`, `c()`, `is.na()`, `round()` --- comes from **base R**. In later chapters, we'll rely heavily on functions from **R packages** (especially the tidyverse). In this section, you'll learn to write your own **user-defined** functions.
+
+### Getting help
+
+For base R and package functions, type `?` followed by the function name in the console to view its documentation:
+
+```{r}
+#| eval: false
+?mean
+?round
+```
+
+The help page appears in RStudio's Help pane, showing the function's description, arguments, and examples.
+
+::: {.callout-tip}
+## Can't remember the exact name?
+Use `??` (double question mark) to **search** across all documentation. For example, `??correlation` will find functions related to correlation, even if you don't know the exact function name.
+:::
+
+::: {.callout-note}
+## `?` doesn't work for user-defined functions
+The `?` help system only works for functions that come with documentation --- i.e., base R and installed packages. Functions you write yourself (like the ones we'll create below) won't have help pages unless you package them into an R package with documentation.
+:::
+
+### Writing your own functions
+
+Now let's learn to create **user-defined** functions. The syntax is:
+
+```r
+function_name <- function(arg1, arg2, arg3) {
+  # body: do something with the arguments
+  result    # the last expression is automatically returned
+}
+```
+
+Let's break this down piece by piece:
+
+- **`function_name`** --- the name you give your function. Follow the same `snake_case` naming rules as variables. Pick a name that describes what the function *does* (e.g., `classify_ckd`, `estimate_egfr`).
+- **`function(...)`** --- the `function` keyword tells R you're creating a function. This is followed by parentheses containing the arguments.
+- **`arg1, arg2, arg3`** --- the **arguments** (inputs). These are placeholder names for the values the caller will provide. You can have zero, one, or many arguments.
+- **`{ ... }`** --- the **body**, wrapped in curly braces. This is the code that runs when the function is called. It can be one line or many lines.
+- **Return value** --- R automatically returns the **last expression** evaluated in the body. You don't need an explicit `return()` statement (though you can use one if you prefer).
+
+Let's start by turning our CKD staging code into a reusable function:
+
+```{r}
+classify_ckd <- function(egfr) {
+  if (egfr >= 90) {
+    "G1 (Normal)"
+  } else if (egfr >= 60) {
+    "G2 (Mild decrease)"
+  } else if (egfr >= 30) {
+    "G3 (Moderate decrease)"
+  } else {
+    "G4-G5 (Severe decrease)"
+  }
+}
+```
+
+Now we can classify any eGFR value with a single call:
+
+```{r}
+classify_ckd(68.9)
+classify_ckd(25.3)
+classify_ckd(95.0)
+```
+
+### Positional vs named arguments
+
+When calling a function, you can pass arguments in two ways:
+
+- **By position** --- R matches arguments left to right, based on the order defined in the function.
+- **By name** --- you explicitly say which argument gets which value using `=`.
+
+```{r}
+round(68.865, 1)             # by position: x = 68.865, digits = 1
+```
+
+```{r}
+round(x = 68.865, digits = 1) # by name: same result, more explicit
+```
+
+```{r}
+round(digits = 1, x = 68.865) # named args can be in any order
+```
+
+::: {.callout-tip}
+## When to use named arguments
+For functions with one or two arguments, positional is fine --- `round(68.865, 1)` is clear enough. But when a function has many arguments, **naming** them makes your code much easier to read. Compare:
+
+- `estimate_egfr(55, 70, 1.2, "Female")` --- what is `70`? What is `1.2`?
+- `estimate_egfr(age = 55, weight_kg = 70, creatinine = 1.2, sex = "Female")` --- self-documenting
+:::
+
+### Default arguments
+
+Sometimes a function argument has a sensible "usual" value. You can specify a **default** by using `=` in the function definition:
+
+```{r}
+greet <- function(name, greeting = "Hello") {
+  paste(greeting, name)
+}
+```
+
+If the caller doesn't provide `greeting`, R uses the default:
+
+```{r}
+greet("Dr. Smith")
+```
+
+```{r}
+greet("Dr. Smith", greeting = "Good morning")
+```
+
+This is useful when most calls use the same value, but you still want the flexibility to override it.
+
+### The complete eGFR function
+
+Now let's build the full Cockcroft-Gault calculation, combining everything we've learned --- arithmetic, variables, if-else, default arguments, and function definition:
+
+```{r}
+estimate_egfr <- function(age, weight_kg, creatinine, sex = "Male") {
+  egfr <- (140 - age) * weight_kg / (72 * creatinine)
+
+  # Apply sex correction factor
+  if (sex == "Female") {
+    egfr <- egfr * 0.85
+  }
+
+  round(egfr, 1)
+}
+```
+
+Here, `sex = "Male"` is a default argument --- if the caller doesn't specify sex, it assumes male (no correction applied).
+
+```{r}
+# Male patient (default sex)
+estimate_egfr(age = 55, weight_kg = 70, creatinine = 1.2)
+```
+
+```{r}
+# Female patient (with 0.85 correction)
+estimate_egfr(age = 70, weight_kg = 58, creatinine = 1.8, sex = "Female")
+```
+
+The female correction factor (× 0.85) lowered the estimate from 31.3 to 26.6 --- a clinically meaningful difference that shifts the CKD stage from G3 to G4--G5.
+
+### Applying functions to vectors
+
+Use `sapply()` to apply a function to each element of a vector:
+
+```{r}
+# Classify each patient's CKD stage
+sapply(round(egfrs, 1), classify_ckd)
+```
+
+::: {.callout-note}
+## Better tools are coming
+`sapply()` works for simple cases, but in later chapters you'll learn `dplyr::mutate()` with `case_when()` --- a much more elegant way to classify and transform columns in a data frame.
+:::
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python defines functions with `def`:
+
+```python
+def estimate_egfr(age, weight_kg, creatinine, sex="Male"):
+    egfr = (140 - age) * weight_kg / (72 * creatinine)
+    if sex == "Female":
+        egfr *= 0.85
+    return round(egfr, 1)
+```
+
+Key differences: `def` keyword (not `function()`), colon after declaration, explicit `return` statement, and indentation-based blocks.
+:::
+
+
+## Packages {#sec-r-pkg}
+
+R comes with useful built-in functions, but its real strength lies in **packages** --- add-ons created by the R community. Think of them as **apps for your phone**: R is the operating system, and packages are the apps that add new capabilities.
+
+### Installing vs loading
+
+There's an important distinction:
+
+| Action | Command | Frequency |
+|---|---|---|
+| **Install** a package | `install.packages("name")` | Once |
+| **Load** a package | `library(name)` | Every R session |
+
+```{r}
+#| eval: false
+# Install (one time — downloads the package)
+install.packages("tidyverse")
+
+# Load (every session — makes functions available)
+library(tidyverse)
+```
+
+::: {.callout-warning}
+## Install once, load every time
+Think of it like apps: you **install** an app once from the store, but you **open** it each time you want to use it. Same with R packages.
+:::
+
+### The `::` notation
+
+You can use a single function from a package without loading the entire package:
+
+```{r}
+#| eval: false
+readr::read_csv("data/diabetes.csv")
+```
+
+The `package::function()` syntax is useful when you only need one function, or when two packages have functions with the same name.
+
+### The tidyverse
+
+The **tidyverse** is a collection of R packages designed for data science. It's the core toolkit we'll use for the rest of this book:
+
+| Package   | Purpose                        |
+|-----------|--------------------------------|
+| `readr`   | Reading data files (CSV, etc.) |
+| `dplyr`   | Data manipulation              |
+| `tidyr`   | Reshaping data                 |
+| `ggplot2` | Data visualization             |
+| `stringr` | Working with text              |
+| `purrr`   | Functional programming         |
+| `tibble`  | Modern data frames             |
+
+: Core tidyverse packages --- load all at once with `library(tidyverse)` {.striped}
+
+We'll explore these packages in depth starting from the next chapter.
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python uses `pip` for installation and `import` for loading:
+
+```python
+# Install (in terminal)
+pip install pandas
+
+# Load (in script)
+import pandas as pd
+
+# Use
+pd.read_csv("data/diabetes.csv")
+```
+
+R's `library(dplyr)` is analogous to Python's `import pandas as pd`.
+:::
+
+
+## The Pipe Operator {#sec-pipe}
+
+As your code becomes more complex, you'll often chain multiple operations together. Without a pipe, this means **nesting** function calls:
+
+```{r}
+# Nested: read from inside out
+sort(round(egfrs, 1))
+```
+
+To read this, you start from the innermost function (`round`) and work outward (`sort`). With two functions it's manageable, but add a few more and it quickly becomes unreadable.
+
+### The `|>` pipe
+
+R's pipe operator `|>` lets you write operations **left to right**, like reading a sentence:
+
+```{r}
+# Piped: read left to right
+egfrs |> round(1) |> sort()
+```
+
+Read this as: *"Take `egfrs`, **then** round to 1 decimal, **then** sort."*
+
+The pipe takes the result from the left side and passes it as the **first argument** to the function on the right.
+
+| Step | Expression         | Passes result to |
+|------|--------------------|------------------|
+| 1    | `egfrs`            | `round()`        |
+| 2    | `round(egfrs, 1)`  | `sort()`         |
+| 3    | `sort(...)`        | final result     |
+
+Here's a more practical example:
+
+```{r}
+# Without pipe
+round(mean(c(1, 2, NA, 4), na.rm = TRUE), 2)
+```
+
+```{r}
+# With pipe — reads naturally
+c(1, 2, NA, 4) |> mean(na.rm = TRUE) |> round(2)
+```
+
+*"Take these numbers, then compute the mean (removing NAs), then round to 2 decimal places."*
+
+### `|>` vs `%>%`
+
+You may encounter `%>%` in older R code or online tutorials. This is the **magrittr** pipe, which was R's original pipe before version 4.1 (2021) added `|>` as a built-in feature.
+
+Both work similarly for most use cases. We'll use **`|>`** throughout this book since it requires no extra packages and is the modern standard.
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python doesn't have a pipe operator. Instead, it uses **method chaining** with the dot `.`:
+
+```python
+(df
+  .query("age > 50")
+  .sort_values("glucose")
+  .head(10)
+)
+```
+
+Conceptually similar to R's pipe --- both enable left-to-right reading of sequential data transformations.
+:::
+
+
+## How to Read Error Messages {#sec-errors}
+
+Error messages are R's way of telling you something went wrong. They can feel cryptic at first, but they follow patterns. Learning to read them is the **#1 beginner survival skill**.
+
+### Errors vs warnings vs messages
+
+- **Error** → code **stopped**. Something is broken and needs fixing.
+- **Warning** → code **ran**, but R thinks something might be off.
+- **Message** → purely informational (e.g., which packages were loaded).
+
+### Common errors and what they mean
+
+| Error Message                   | What It Means                                          |
+|---------------------------------|--------------------------------------------------------|
+| `object 'x' not found`         | Typo in variable name, or forgot to run the line that creates it |
+| `could not find function`       | Package not loaded --- did you forget `library()`?     |
+| `unexpected ')' in ...`         | Mismatched parentheses --- count your opening and closing parens |
+| `non-numeric argument`          | Used text where a number was expected                  |
+| `there is no package called`    | Package not installed --- run `install.packages()` first |
+
+: Common R errors and their meanings {.striped}
+
+Let's see a common one in action:
+
+```{r}
+#| error: true
+# Typo in variable name
+egfr_value <- 68.9
+egrf_value             # oops — "egrf" instead of "egfr"
+```
+
+R tells you exactly what it can't find. Read the message, spot the typo, and fix it.
+
+Here's another common one --- calling a function from a package you haven't loaded:
+
+```{r}
+#| eval: false
+read_csv("data/diabetes.csv")
+```
+
+```
+Error in read_csv("data/diabetes.csv") :
+  could not find function "read_csv"
+```
+
+The fix: add `library(readr)` or `library(tidyverse)` at the top of your script.
+
+::: {.callout-tip}
+## The debugging habit
+
+When you see an error:
+
+1. **Read** the error message carefully
+2. **Look** at the line it points to
+3. **Check** for typos, missing parentheses, or unloaded packages
+4. If stuck, **copy-paste** the error message into a search engine or ask an AI assistant --- chances are, someone has had the same problem before
+:::
+
+
+## Summary
+
+In this chapter, you've learned the core building blocks of R programming. Here's the journey we took with our eGFR example:
+
+| Step    | What we did                              | R concept             |
+|---------|------------------------------------------|-----------------------|
+| Start   | `(140 - 55) * 70 / (72 * 1.2)`          | Arithmetic operators  |
+| Store   | `age`, `weight_kg`, `creatinine`         | Variables             |
+| Verify  | `typeof()`, `class()`                    | Data types            |
+| Scale   | 5 patients at once                       | Vectors               |
+| Filter  | `egfrs < 60`                             | Logical comparisons   |
+| Handle  | Missing creatinine                       | `NA` and `na.rm`      |
+| Decide  | CKD staging                              | `if` / `else if` / `else` |
+| Wrap    | `estimate_egfr()`                        | Functions             |
+| Chain   | `\|>`                                    | Pipes                 |
+
+These fundamentals are the foundation for everything that follows. In the next chapter, we'll learn about **data frames** --- R's structure for tabular data --- and start working with real medical datasets.
+
+
+## Exercises {.unnumbered}
+
+1. **BMI calculator.** Create variables `weight_kg` and `height_m` for a patient, then calculate BMI using the formula: $BMI = weight / height^2$. What is the BMI of a patient who weighs 85 kg and is 1.72 m tall?
+
+2. **Blood pressure classifier.** Write an `if` / `else if` / `else` statement that classifies a systolic blood pressure value (`sbp`) into:
+   - "Normal" (below 120)
+   - "Elevated" (120--129)
+   - "High" (130 or above)
+
+   Test it with `sbp <- 135`.
+
+3. **Temperature converter.** Write a function `f_to_c()` that converts Fahrenheit to Celsius using the formula: $C = (F - 32) \times 5/9$. Test it with 98.6°F (normal body temperature) and 104°F (fever).
+
+4. **Lab value analysis.** Given this vector of hemoglobin values (g/dL):
+   ```{r}
+   #| eval: false
+   hgb <- c(12.5, NA, 15.2, 10.8, 14.1, NA, 11.3)
+   ```
+   Answer these questions using R:
+
+   a. How many values are missing?
+   b. What is the mean hemoglobin, excluding missing values?
+   c. How many patients have hemoglobin below 12 g/dL (a simplified anemia threshold)?
