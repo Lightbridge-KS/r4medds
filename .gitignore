@@ -1,0 +1,22 @@
+# Temp file
+~$*
+
+# Internal Docs
+_plan/
+_progress/
+
+# MacOS
+*.DS_Store
+
+# R
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+.quarto
+
+# Quarto
+/.quarto/
+_book/
+
+**/*.quarto_ipynb
