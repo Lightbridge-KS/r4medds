@@ -16,7 +16,10 @@ book:
     - part: "R Foundations"
       chapters:
         - contents/chapters/03-r-programming.qmd
-        - contents/chapters/04-data-manipulation-v2.qmd
+        - contents/chapters/04-data-manipulation.qmd
+    - part: "Data Visualization"
+      chapters:
+        - contents/chapters/05-ggplot2.qmd
     - references.qmd
 
 bibliography: references.bib

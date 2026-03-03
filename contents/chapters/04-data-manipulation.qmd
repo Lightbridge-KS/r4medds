@@ -127,34 +127,40 @@ In real projects, data usually arrives as files. Let’s import both versions of
 ### A) Import CSV with `read_csv()`
 
 ```{r}
-diabetes_raw <- read_csv("../../data/diabetes.csv", show_col_types = FALSE)
+diabetes_csv <- read_csv("../../data/diabetes.csv", show_col_types = FALSE)
 ```
 
 ```{r}
-names(diabetes_raw)
-nrow(diabetes_raw)
+names(diabetes_csv)
+nrow(diabetes_csv)
 ```
 
 ```{r}
-str(diabetes_raw)
+str(diabetes_csv)
 ```
 
 ```{r}
-glimpse(diabetes_raw)
+glimpse(diabetes_csv)
 ```
 
 ```{r}
-summary(diabetes_raw)
+summary(diabetes_csv)
 ```
 
 ### B) Import Excel with `read_excel()`
 
 ```{r}
-diabetes_raw <- read_excel("../../data/diabetes.xlsx")
+diabetes_xlsx <- read_excel("../../data/diabetes.xlsx")
 ```
 
 ```{r}
-glimpse(diabetes_raw)
+glimpse(diabetes_xlsx)
+```
+
+By default in this chapter, we will continue with `diabetes_csv` as our main working table:
+
+```{r}
+diabetes_raw <- diabetes_csv
 ```
 
 You can also read a specific Excel sheet or range:
@@ -171,7 +177,20 @@ read_excel("../../data/diabetes.xlsx", range = "A1:D20")
 - **Unexpected missing values** (`"NA"`, blanks, custom codes)
 - **Wrong variable type** (e.g., numbers imported as text)
 
-After import, check column names & types (`str()`, `glimpse()`), and may be a quick summary (`summary()`) before analysis.
+After import, check column names and types (`str()`, `glimpse()`), then run a quick summary (`summary()`) before analysis.
+:::
+
+::: {.callout-note}
+## 60-second import checklist
+
+Right after reading a new file, run these first:
+
+1. `names(data)`
+2. `nrow(data)` and `ncol(data)`
+3. `glimpse(data)`
+4. `summary(data)`
+
+This quick routine catches most early data problems.
 :::
 
 ::: {.callout-caution collapse="true" title="Python Comparison"}
@@ -188,7 +207,7 @@ diabetes_raw = pd.read_excel("data/diabetes.xlsx")
 
 ## Prepare Column Names for Comfortable Coding
 
-The raw dataset uses names like `glucose_mg-dl` and `dbp_mm-hg`. These are meaningful, but the hyphen (`-`) is not a best naming convention for dataframe column names.
+The raw dataset uses names like `glucose_mg-dl` and `dbp_mm-hg`. These are meaningful, but the hyphen (`-`) is not ideal for data frame column names in R code.
 
 A common workflow is:
 
@@ -202,7 +221,7 @@ diabetes <- diabetes_raw |> janitor::clean_names()
 ::: {.callout-tip appearance="default" collapse="true"}
 ### Tips: `janitor` R package
 
-The `janitor` R package provide useful functionalities for cleaning data in R. The `clean_names()` is one of them. Have a look at <https://sfirke.github.io/janitor/>. 
+The `janitor` package provides useful functions for cleaning data in R. `clean_names()` is one of the most helpful. Have a look at <https://sfirke.github.io/janitor/>.
 :::
 
 Column names before and after cleaning:
@@ -233,7 +252,7 @@ Before syntax, keep this mental model:
 
 ### 1) Column operations: `select()` and `rename()`
 
-Use `select()` when you want select a **subset** of column. 
+Use `select()` when you want to select a **subset** of columns.
 
 ```{r}
 diabetes |>
@@ -241,7 +260,7 @@ diabetes |>
   head()
 ```
 
-Use `rename()` when you want to **rename** a column, to improves readability.
+Use `rename()` when you want to rename a column to improve readability.
 
 ```{r}
 diabetes |>
@@ -255,7 +274,7 @@ diabetes |>
 
 ### 2) Row operations: `filter()` and `arrange()`
 
-Use `filter()` to keep rows that the condition in `filter(...)` evaluate to `TRUE`. 
+Use `filter()` to keep rows where the condition inside `filter(...)` evaluates to `TRUE`.
 
 ```{r}
 diabetes |>
@@ -312,6 +331,7 @@ diabetes |>
 ```
 
 This gives a quick cohort-level comparison by 5-year diabetes outcome.
+In most runs, you'll see that the `pos` group has higher mean glucose than the `neg` group --- a good sanity check that the summary aligns with clinical expectations.
 
 ### Build a short pipeline (incremental complexity)
 
@@ -333,14 +353,14 @@ Read it left-to-right:
 3. Compare BMI by glucose group
 
 ::: {.callout-caution collapse="true" title="Python Comparison"}
-R pipeline idea in pandas:
+R pipeline idea in pandas (using cleaned snake_case columns):
 
 ```python
 (
-    diabetes_raw.query("age >= 30")
-    .assign(high_glucose=lambda df: df["glucose_mg-dl"] >= 140)
+    diabetes.query("age >= 30")
+    .assign(high_glucose=lambda df: df["glucose_mg_dl"] >= 140)
     .groupby("high_glucose", as_index=False)
-    .agg(n=("glucose_mg-dl", "size"), avg_bmi=("bmi", "mean"))
+    .agg(n=("glucose_mg_dl", "size"), avg_bmi=("bmi", "mean"))
 )
 ```
 :::

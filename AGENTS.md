@@ -54,6 +54,18 @@ Where possible, thread a single domain-relevant example throughout the chapter. 
 - **Common mistakes / pitfalls** → `.callout-warning`
 - **Em dash** → `---` (Quarto style)
 
+## Authoring Workflow
+
+- Use `_explore/` as a sandbox for chapter development:
+  - `_explore/scripts/` for ad-hoc R scripts
+  - `_explore/plots/` for draft figure outputs
+  - `_explore/notes/` for interpretation notes and writing decisions
+- For data/visualization chapters, prefer this loop:
+  1. Prototype in `_explore/`
+  2. Validate outputs/plots and interpretation
+  3. Port refined code + prose into `contents/chapters/*.qmd`
+- Keep chapter-facing code beginner-friendly and explicit. If introducing new syntax, explain it before or immediately at first use.
+
 ## Deploy
 
 - Netlify: https://r4medds.netlify.app

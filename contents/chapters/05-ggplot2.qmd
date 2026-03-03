@@ -1,0 +1,375 @@
+# Data Visualization with ggplot2
+
+In the previous chapter, we learned how to import, inspect, and transform data. In this chapter, we move to the next core skill: **visualization**.
+
+For many beginners, `ggplot2` feels difficult at first because of its layered syntax. That is normal. We will move step by step and explain every new concept before using it.
+
+```{r}
+#| message: false
+#| warning: false
+library(tidyverse)
+library(janitor)
+library(ggsci)
+library(palmerpenguins)
+```
+
+::: {.callout-note}
+## Our running example: visualizing a diabetes registry
+
+Throughout this chapter, we will use `data/diabetes.csv` as our main dataset.
+
+Our guiding questions are practical:
+
+- How are glucose values distributed?
+- How do distributions differ by diabetes outcome?
+- How does BMI relate to glucose?
+- How do we present this clearly in a professional setting?
+:::
+
+
+## Why Visualization Matters in Clinical Work
+
+A table is precise, but a figure is often faster to interpret. Good visualizations help us:
+
+1. detect patterns and outliers,
+2. compare groups,
+3. communicate clearly with teams,
+4. prepare publication- or presentation-ready outputs.
+
+In clinical analytics, clear figures reduce misunderstanding and improve decision-making.
+
+
+## Before Plotting: Prepare the Data
+
+```{r}
+diabetes_raw <- read_csv("../../data/diabetes.csv", show_col_types = FALSE)
+
+diabetes <- diabetes_raw |>
+  clean_names() |>
+  mutate(
+    diabetes_5y = fct_relevel(diabetes_5y, "neg", "pos"),
+    bmi_class = case_when(
+      bmi < 18.5 ~ "Underweight",
+      bmi < 25 ~ "Normal",
+      bmi < 30 ~ "Overweight",
+      TRUE ~ "Obesity"
+    ) |> factor(levels = c("Underweight", "Normal", "Overweight", "Obesity"))
+  )
+
+glimpse(diabetes)
+```
+
+### New helper functions used above
+
+We introduced three functions that are important for plotting workflows:
+
+- **`clean_names()`** (`janitor`)  
+  standardizes column names to a coding-friendly style.
+- **`fct_relevel()`** (`forcats`)  
+  sets factor order explicitly (so plot order is controlled).
+- **`drop_na()`** (`tidyr`, used later)  
+  removes rows with missing values in selected columns.
+
+::: {.callout-tip}
+## Practical pre-plot checklist
+
+Before making any plot, check:
+
+1. `names(data)`
+2. `glimpse(data)`
+3. `summary(data)`
+
+This catches many errors early.
+:::
+
+
+## The ggplot2 Mental Model (Teach Before Use)
+
+Most plots follow this structure:
+
+```r
+ggplot(data = my_data, aes(x = ..., y = ...)) +
+  geom_*()
+```
+
+Let’s break this down:
+
+- **`ggplot(data = ...)`** --- choose the dataset.
+- **`aes(...)`** --- map variables to visual properties.
+  - `x` and `y` are most common.
+  - `color` and `fill` are also common.
+- **`geom_*()`** --- choose how to draw marks (bars, points, boxes, etc.).
+- **`+`** --- add layers to the plot.
+
+Think: **data + mapping + geometry + layers**.
+
+### Why `+` appears at the end of lines
+
+In `ggplot2`, each `+` means "add the next layer." Writing one layer per line makes code easier to read.
+
+```r
+ggplot(...) +
+  geom_...() +
+  labs(...) +
+  theme_...()
+```
+
+
+## First Plot: Histogram of Glucose
+
+A histogram is a strong first choice for a continuous variable.
+
+```{r}
+ggplot(diabetes, aes(x = glucose_mg_dl)) +
+  geom_histogram(binwidth = 10, fill = "#2C7FB8", color = "white", alpha = 0.9) +
+  geom_vline(xintercept = 140, linetype = "dashed", linewidth = 1, color = "#D95F02") +
+  annotate("text", x = 142, y = 85, label = "140 mg/dL", hjust = 0, color = "#D95F02") +
+  labs(
+    title = "Distribution of Plasma Glucose",
+    subtitle = "Diabetes dataset (Pima)",
+    x = "Glucose (mg/dL)",
+    y = "Number of patients"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+### New syntax in this plot
+
+- **`geom_histogram(binwidth = 10)`**: create histogram bars with width 10 units.
+- **`geom_vline(xintercept = 140)`**: draw vertical reference line at x = 140.
+- **`annotate("text", ...)`**: place custom text on plot.
+- **`labs(...)`**: set title, subtitle, axis labels.
+- **`theme_minimal()`**: apply a clean visual theme.
+
+Interpretation: this plot shows distribution shape and spread. The dashed 140 mg/dL line is a useful clinical reference.
+
+
+## Group Comparison: Boxplot + Jitter
+
+When comparing a continuous variable across groups, boxplots are often the best starting point.
+
+```{r}
+diabetes_box <- diabetes |>
+  drop_na(glucose_mg_dl, diabetes_5y)
+
+ggplot(diabetes_box, aes(x = diabetes_5y, y = glucose_mg_dl, fill = diabetes_5y)) +
+  geom_boxplot(alpha = 0.75, outlier.shape = NA) +
+  geom_jitter(width = 0.15, alpha = 0.25, size = 1, color = "#333333") +
+  scale_fill_manual(values = c("neg" = "#4DAF4A", "pos" = "#E41A1C")) +
+  labs(
+    title = "Glucose by 5-Year Diabetes Outcome",
+    x = "Outcome at 5 years",
+    y = "Glucose (mg/dL)",
+    fill = "Outcome"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+### New syntax in this plot
+
+- **`drop_na(col1, col2)`**: keep only rows where selected columns are not missing.
+- **`geom_boxplot()`**: show median, quartiles, and spread.
+- **`geom_jitter(width = ...)`**: add points with slight horizontal noise to reduce overlap.
+- **`scale_fill_manual(...)`**: choose custom colors for groups.
+
+Interpretation: the `pos` group tends to have higher glucose values than the `neg` group.
+
+
+## Relationship Plot: Scatter + Trend Line
+
+Use a scatter plot to examine two numeric variables together.
+
+```{r}
+diabetes_scatter <- diabetes |>
+  drop_na(bmi, glucose_mg_dl, diabetes_5y)
+
+ggplot(diabetes_scatter, aes(x = bmi, y = glucose_mg_dl, color = diabetes_5y)) +
+  geom_point(alpha = 0.65, size = 2) +
+  geom_smooth(method = "lm", se = TRUE, linewidth = 1) +
+  scale_color_manual(values = c("neg" = "#1B9E77", "pos" = "#D95F02")) +
+  labs(
+    title = "Relationship Between BMI and Glucose",
+    subtitle = "Colored by 5-year diabetes outcome",
+    x = "Body mass index (kg/m²)",
+    y = "Glucose (mg/dL)",
+    color = "Outcome"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+### New syntax in this plot
+
+- **`geom_point()`**: draw one point per observation.
+- **`geom_smooth(method = "lm", se = TRUE)`**: add a **linear** trend line with confidence band.
+- **`se = TRUE`**: show the confidence band around the fitted line.
+- **`scale_color_manual(...)`**: set manual colors for `color` aesthetic.
+
+Notable option to explore:
+
+- If you write `geom_smooth()` **without** `method = "lm"`, ggplot2 will use its default smoothing method (typically a non-linear smoother for smaller datasets). This is useful for exploratory visualization when relationships may not be linear.
+
+Interpretation: the trend appears positive (higher BMI associated with higher glucose), but this is descriptive, not causal.
+
+
+## Categorical Comparison: Bar Chart
+
+Now we compare counts across category combinations.
+
+```{r}
+bmi_counts <- diabetes |>
+  count(diabetes_5y, bmi_class)
+
+ggplot(bmi_counts, aes(x = bmi_class, y = n, fill = diabetes_5y)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "BMI Class Distribution by 5-Year Diabetes Outcome",
+    x = "BMI class",
+    y = "Number of patients",
+    fill = "Outcome"
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(axis.text.x = element_text(angle = 20, hjust = 1))
+```
+
+### New syntax in this plot
+
+- **`count(var1, var2)`**: quick grouped counts.
+- **`geom_col()`**: bar chart using precomputed y values.
+- **`position = "dodge"`**: place bars side-by-side for comparison.
+
+Notable options to explore:
+
+- **`position = "stack"`** (default): stack groups in one bar.
+- **`position = "fill"`**: show proportions (each bar scaled to 100%).
+- **`position = "identity"`**: draw bars on top of each other (usually with transparency).
+
+This plot communicates subgroup composition more clearly than a printed table.
+
+
+## Faceting: One Figure, Multiple Panels
+
+Faceting splits one plotting template into several panels by subgroup.
+
+```{r}
+diabetes_facet <- diabetes |>
+  drop_na(glucose_mg_dl, diabetes_5y)
+
+ggplot(diabetes_facet, aes(x = glucose_mg_dl)) +
+  geom_histogram(binwidth = 10, fill = "#3B528B", color = "white") +
+  facet_wrap(~ diabetes_5y, nrow = 1) +
+  labs(
+    title = "Glucose Distribution Stratified by Outcome",
+    x = "Glucose (mg/dL)",
+    y = "Number of patients"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+### New syntax in this plot
+
+- **`facet_wrap(~ group_var)`**: create separate panels by a grouping variable.
+
+Faceting reduces clutter and makes within-group patterns easier to inspect.
+
+
+## Professional Styling Checklist
+
+Before sharing a figure in slides or reports, verify:
+
+- title is informative,
+- axes include units,
+- legend labels are clear,
+- colors are interpretable and consistent,
+- theme is readable.
+
+Good analysis with unclear visuals is still weak communication.
+
+
+## A "Wow" Figure with ggsci (Palmer Penguins)
+
+Near the end of the chapter, we now add a style-focused example. The goal is to demonstrate what a polished, scientific-looking figure can look like.
+
+```{r}
+penguins_clean <- penguins |>
+  drop_na(bill_length_mm, flipper_length_mm, species)
+
+ggplot(penguins_clean, aes(x = bill_length_mm, y = flipper_length_mm, color = species)) +
+  geom_point(alpha = 0.9, size = 2.4) +
+  geom_smooth(method = "lm", se = FALSE, linewidth = 0.9) +
+  scale_color_lancet() +
+  labs(
+    title = "Palmer Penguins: Bill Length vs Flipper Length",
+    subtitle = "Styled with ggsci Lancet palette for publication-like aesthetics",
+    x = "Bill length (mm)",
+    y = "Flipper length (mm)",
+    color = "Species",
+    caption = "Data: palmerpenguins"
+  ) +
+  theme_minimal(base_size = 13) +
+  theme(
+    plot.title = element_text(face = "bold", size = 15),
+    plot.subtitle = element_text(size = 11, color = "#555555"),
+    panel.grid.minor = element_blank(),
+    legend.position = "top"
+  )
+```
+
+### New syntax in this plot
+
+- **`scale_color_lancet()`** (`ggsci`): apply Lancet-inspired color palette.
+- **`geom_smooth(..., se = FALSE)`**: show the fitted line without confidence band (cleaner presentation style).
+- **`theme(...)`**: fine-tune specific visual elements (title font, grid lines, legend position).
+
+This example is intentionally style-forward: fundamentals first, then refinement.
+
+
+## End-to-End Mini Workflow
+
+Now combine transform + summarize + visualize in one pipeline:
+
+```{r}
+diabetes |>
+  filter(glucose_mg_dl > 0, bmi > 0) |>
+  mutate(glucose_group = if_else(glucose_mg_dl >= 140, "High", "Not High")) |>
+  group_by(diabetes_5y, glucose_group) |>
+  summarise(n = n(), .groups = "drop") |>
+  ggplot(aes(x = diabetes_5y, y = n, fill = glucose_group)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Count of High vs Non-High Glucose by 5-Year Outcome",
+    x = "Outcome at 5 years",
+    y = "Number of patients",
+    fill = "Glucose group"
+  ) +
+  theme_minimal(base_size = 12)
+```
+
+This pattern is practical for real reporting:
+
+**filter/transform -> summarise -> visualize**
+
+
+## Summary
+
+| Step | What we learned | Why it matters |
+|---|---|---|
+| 1 | ggplot mental model | Reduces syntax confusion |
+| 2 | Histogram and boxplot | Understand distributions and group differences |
+| 3 | Scatter + trend line | Explore variable relationships |
+| 4 | Bar chart and faceting | Compare categories and subgroups clearly |
+| 5 | Styling with ggsci | Improve professional presentation quality |
+
+In the next chapter, we will move from visual summaries to formal **descriptive statistics**.
+
+
+## Exercises {.unnumbered}
+
+1. **Histogram practice.** Create a histogram of `glucose_mg_dl` with bin width 5 and add a vertical line at 140 mg/dL.
+
+2. **Boxplot interpretation.** Create a boxplot of `bmi` by `diabetes_5y` with jitter points. Write 2–3 sentences describing what you observe.
+
+3. **Scatter with trend.** Plot `age` vs `glucose_mg_dl`, color by `diabetes_5y`, and add a linear trend line.
+
+4. **Professional styling challenge.** Recreate one diabetes plot using a `ggsci` palette (e.g., Lancet or NPG), with polished title, labels, and caption for a conference slide.
+
+Solutions will be provided in Appendix C.
