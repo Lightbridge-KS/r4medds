@@ -1,0 +1,374 @@
+# Data Manipulation
+
+In the last chapter, we learned core R syntax and programming concepts. In this chapter, we apply those skills to tabular clinical data: understanding data frames, importing files, manipulating data with `dplyr`, and using tidy data principles.
+
+```{r}
+#| message: false
+#| warning: false
+library(tidyverse)
+library(readxl)
+library(medicaldata)
+```
+
+::: {.callout-note}
+## Our running example: From scurvy screening table to diabetes registry cleanup
+
+We will start with a tiny dataset (`scurvy`) to build intuition for data frames and tidy manipulation. Then we will transition to a more realistic workflow using a diabetes registry file (`data/diabetes.csv`, `data/diabetes.xlsx`) for import and analysis tasks.
+:::
+
+
+## What Is a Data Frame/Tibble?
+
+A **vector** stores one type of value in one dimension. A **data frame** stores multiple variables as columns and observations as rows. A **tibble** is the modern tidyverse version of a data frame with cleaner printing and safer defaults.
+
+| Structure | Best for | Example |
+|---|---|---|
+| Vector | One variable | `c(55, 62, 47)` |
+| Data frame | Multiple variables in tabular form | `data.frame(age, sex, glucose)` |
+| Tibble | Modern tabular workflow | `tibble(age, sex, glucose)` |
+
+### Simple example first
+
+```{r}
+patients_tbl <- tibble(
+  patient_id = c("P001", "P002", "P003"),
+  age = c(55, 62, 47),
+  sex = c("Female", "Male", "Female"),
+  glucose_mg_dl = c(145, 132, 178)
+)
+
+patients_tbl
+```
+
+```{r}
+class(patients_tbl)
+dim(patients_tbl)
+names(patients_tbl)
+```
+
+### Explore `scurvy` dataset
+
+Load `scurvy` dataset
+
+```{r}
+data("scurvy", package = "medicaldata")
+```
+
+```{r}
+scurvy |> head()
+```
+
+
+```{r}
+class(scurvy)
+dim(scurvy)
+names(scurvy)
+glimpse(scurvy)
+```
+
+### Core manipulation syntax
+
+Most tidyverse data manipulation follows this pattern:
+
+```r
+dataset |> verb(arguments)
+```
+
+- **`dataset`** --- the table you start with
+- **`|>`** --- the pipe that sends the left-hand result to the next step
+- **`verb(...)`** --- a function that does one clear operation (filter rows, select columns, summarize)
+
+Example:
+
+```{r}
+scurvy |>
+  select(study_id, treatment)
+```
+
+::: {.callout-tip}
+## One small verb at a time
+Start with one manipulation verb per line. Once each step is clear, combine them into a pipeline.
+:::
+
+
+## Import Data (CSV + Excel Hands-on)
+
+In real projects, data often starts as files. We will import CSV and Excel versions of the same diabetes dataset.
+
+**A) Import CSV with `read_csv()`**
+
+```{r}
+diabetes_csv <- read_csv("../../data/diabetes.csv", show_col_types = FALSE)
+```
+
+```{r}
+head(diabetes_csv)
+```
+
+**B) Import Excel with `read_excel()`**
+
+```{r}
+diabetes_xlsx <- read_excel("../../data/diabetes.xlsx")
+```
+
+```{r}
+glimpse(diabetes_xlsx)
+```
+You can choose to read from a specific sheet or cell range:
+
+```{r}
+#| eval: false
+# Example: read a specific sheet/range from Excel
+read_excel("../../data/diabetes.xlsx", sheet = 1, range = "A1:D20")
+```
+
+::: {.callout-warning}
+## Common import pitfalls
+- **Path error:** `"cannot open the connection"` usually means wrong file path.
+- **Missing values encoded oddly:** values like `"NA"`, `"-"`, or blank strings may need explicit cleaning.
+- **Type guessing mismatch:** numeric-looking columns may import as text if they include non-numeric tokens.
+
+When troubleshooting, always run `glimpse()` and `summary()` right after import.
+:::
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+In Python `pandas`, the equivalent import is:
+
+```python
+import pandas as pd
+
+diabetes_csv = pd.read_csv("data/diabetes.csv")
+diabetes_xlsx = pd.read_excel("data/diabetes.xlsx")
+```
+
+In R, we typically use `readr::read_csv()` and `readxl::read_excel()`.
+:::
+
+
+## Core `dplyr` Verbs
+
+Before this, Let's do automatic data cleaning first with `janitor::clean_names()`, which is a convenience function to clean & standardize column names.
+
+```{r}
+diabetes <- medicaldata::diabetes |> janitor::clean_names()
+```
+
+Column names before:
+
+```{r}
+names(medicaldata::diabetes)
+```
+
+
+Column names after:
+
+```{r}
+names(diabetes)
+```
+
+
+What is dplyr? ...
+
+
+| Category | Verbs | Purpose |
+|---|---|---|
+| Row operations | `filter()`, `arrange()` | Keep and order patients |
+| Column operations | `select()`, `rename()` | Choose and relabel variables |
+| Create/transform | `mutate()` | Derive new variables |
+| Aggregate | `group_by()`, `summarise()` | Build cohort summaries |
+
+### Column operations: `select()` and `rename()`
+
+```{r}
+diabetes |>
+  select(glucose_mg_dl, bmi, age, diabetes_5y) |>
+  head()
+```
+
+```{r}
+diabetes |>
+  rename(
+    age_years = age,
+    outcome_5y = diabetes_5y
+  ) |>
+  head()
+```
+
+### Row operations: `filter()` and `arrange()`
+
+```{r}
+diabetes |>
+  filter(glucose_mg_dl >= 140) |>
+  head()
+```
+
+```{r}
+diabetes |>
+  arrange(desc(glucose_mg_dl)) |>
+  select(glucose_mg_dl, bmi, age, diabetes_5y) |>
+  head()
+```
+
+### Create variables: `mutate()`
+
+```{r}
+diabetes |>
+  mutate(
+    high_glucose = glucose_mg_dl >= 140,
+    bmi_class = case_when(
+      bmi < 18.5 ~ "Underweight",
+      bmi < 25 ~ "Normal",
+      bmi < 30 ~ "Overweight",
+      TRUE ~ "Obesity"
+    )
+  ) |>
+  select(glucose_mg_dl, bmi, high_glucose, bmi_class) |>
+  head()
+```
+
+### Aggregate with `group_by()` + `summarise()`
+
+```{r}
+diabetes |>
+  group_by(diabetes_5y) |>
+  summarise(
+    n = n(),
+    mean_glucose = mean(glucose_mg_dl, na.rm = TRUE),
+    mean_bmi = mean(bmi, na.rm = TRUE)
+  )
+```
+
+### Incremental complexity: combine 2-3 verbs
+
+```{r}
+diabetes |>
+  filter(age >= 30) |>
+  mutate(high_glucose = glucose_mg_dl >= 140) |>
+  group_by(high_glucose) |>
+  summarise(
+    n = n(),
+    avg_bmi = mean(bmi, na.rm = TRUE)
+  )
+```
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+A common pandas mental mapping is:
+
+- `filter/select/mutate/group_by + summarise` in R
+- `query/loc/assign/groupby().agg()` in pandas
+
+```python
+(
+    diabetes_csv.query("age >= 30")
+    .assign(high_glucose=lambda df: df["glucose_mg-dl"] >= 140)
+    .groupby("high_glucose", as_index=False)
+    .agg(n=("glucose_mg-dl", "size"), avg_bmi=("bmi", "mean"))
+)
+```
+:::
+
+
+## Tidy Data Principle (Wide vs Long)
+
+A dataset is **tidy** when:
+
+1. Each variable has its own column.
+2. Each observation has its own row.
+3. Each value has its own cell.
+
+### Why this matters
+
+Tidy format makes manipulation, summaries, and visualization much easier. Many tidyverse tools are designed around tidy data assumptions.
+
+### Example: from wide to long
+
+```{r}
+bp_wide <- tibble(
+  patient_id = c("P001", "P002", "P003"),
+  bp_day1 = c(142, 130, 150),
+  bp_day2 = c(138, 128, 147),
+  bp_day3 = c(135, 126, 145)
+)
+
+bp_wide
+```
+
+```{r}
+bp_long <- bp_wide |>
+  pivot_longer(
+    cols = starts_with("bp_day"),
+    names_to = "day",
+    values_to = "systolic_bp"
+  )
+
+bp_long
+```
+
+```{r}
+# Optional reverse: long back to wide
+bp_long |>
+  pivot_wider(
+    names_from = day,
+    values_from = systolic_bp
+  )
+```
+
+In the next chapter (visualization), long-format data will help us build cleaner and more flexible plots.
+
+
+## End-to-End Mini Workflow
+
+Now we combine key steps in one compact pipeline.
+
+```{r}
+diabetes |>
+  select(glucose_mg_dl, dbp_mm_hg, bmi, age, diabetes_5y) |>
+  filter(
+    glucose_mg_dl > 0,
+    dbp_mm_hg > 0,
+    bmi > 0,
+    age >= 18
+  ) |>
+  mutate(
+    glucose_group = if_else(glucose_mg_dl >= 140, "High", "Not High"),
+    bmi_class = case_when(
+      bmi < 25 ~ "Normal",
+      bmi < 30 ~ "Overweight",
+      TRUE ~ "Obesity"
+    )
+  ) |>
+  group_by(diabetes_5y, glucose_group, bmi_class) |>
+  summarise(
+    n = n(),
+    mean_age = mean(age, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+This is the core workflow pattern you will reuse repeatedly: **import -> inspect -> clean -> transform -> summarize**.
+
+
+## Summary
+
+| Step | What we did | Concept learned |
+|---|---|---|
+| 1 | Built and inspected small tables | data frame vs tibble fundamentals |
+| 2 | Imported CSV and Excel files | practical data import workflow |
+| 3 | Applied core `dplyr` verbs | row/column/transform/aggregate operations |
+| 4 | Reshaped wide blood pressure data | tidy data principle (`pivot_longer`) |
+| 5 | Built one end-to-end pipeline | reproducible manipulation workflow |
+
+In the next chapter, we will use these cleaned and tidy tables to create clear, publication-ready visualizations with `ggplot2`.
+
+
+## Exercises {.unnumbered}
+
+1. **ICU vitals filtering.** Create a tibble with `patient_id`, `heart_rate`, `resp_rate`, and `spo2` for 8 patients. Keep only rows with `spo2 < 94` and sort by lowest `spo2` first.
+
+2. **OPD lab import and cleanup.** Import a mock CSV file of outpatient lab values (`hb`, `wbc`, `platelet`, `clinic`). Use `select()` to keep clinically relevant columns and `rename()` to standardize names.
+
+3. **Department-level summary.** Given a table with `department`, `outcome`, and `length_of_stay`, compute counts and mean length of stay grouped by `department` and `outcome`.
+
+4. **Ward-round reshaping task.** Start with a wide table containing `bp_day1`, `bp_day2`, `bp_day3`. Convert it to tidy long format, then compute mean blood pressure by day.
+
+Solutions will be provided in Appendix C.
