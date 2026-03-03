@@ -1,0 +1,293 @@
+# Descriptive Statistics
+
+In this chapter, we focus on practical implementation of descriptive statistics in R. The emphasis is on reusable coding patterns for clinical datasets, rather than detailed statistical theory.
+
+By the end of this chapter, you should be able to quickly generate:
+
+- continuous-variable summaries,
+- categorical n (%) summaries,
+- grouped summaries by outcome,
+- missingness reports,
+- and a publication-ready baseline table.
+
+```{r}
+#| message: false
+#| warning: false
+library(tidyverse)
+library(janitor)
+library(gtsummary)
+```
+
+::: {.callout-note}
+## Running example: diabetes registry summary
+
+We will continue using `data/diabetes.csv` and answer one practical question:
+
+**How can we summarize this cohort in a clear, reproducible, report-ready format?**
+:::
+
+
+## Data Setup for This Chapter
+
+```{r}
+diabetes_raw <- read_csv("../../data/diabetes.csv", show_col_types = FALSE)
+
+diabetes <- diabetes_raw |>
+  clean_names() |>
+  mutate(
+    diabetes_5y = fct_relevel(diabetes_5y, "neg", "pos"),
+    bmi_class = case_when(
+      bmi < 18.5 ~ "Underweight",
+      bmi < 25 ~ "Normal",
+      bmi < 30 ~ "Overweight",
+      TRUE ~ "Obesity"
+    ) |> factor(levels = c("Underweight", "Normal", "Overweight", "Obesity"))
+  )
+
+glimpse(diabetes)
+```
+
+### Syntax notes (data setup)
+
+- **`clean_names()`** standardizes variable names for easier coding.
+- **`fct_relevel(diabetes_5y, "neg", "pos")`** sets category order explicitly.
+- **`case_when(...)`** creates a new categorical variable using rule-based conditions.
+- **`factor(levels = ...)`** fixes display/reporting order for categories.
+
+
+## 1) Continuous Variables: Fast Summary in R
+
+For continuous variables, the most common descriptive statistics are:
+
+- mean and standard deviation (SD),
+- median and interquartile range (IQR),
+- minimum and maximum.
+
+### Single variable example
+
+```{r}
+mean(diabetes$glucose_mg_dl, na.rm = TRUE)
+sd(diabetes$glucose_mg_dl, na.rm = TRUE)
+median(diabetes$glucose_mg_dl, na.rm = TRUE)
+IQR(diabetes$glucose_mg_dl, na.rm = TRUE)
+```
+
+### Multiple variables with one reusable pattern
+
+```{r}
+diabetes |>
+  summarise(
+    across(
+      .cols = c(age, bmi, glucose_mg_dl, dbp_mm_hg),
+      .fns = list(
+        n = ~sum(!is.na(.x)),
+        mean = ~mean(.x, na.rm = TRUE),
+        sd = ~sd(.x, na.rm = TRUE),
+        median = ~median(.x, na.rm = TRUE),
+        iqr = ~IQR(.x, na.rm = TRUE),
+        min = ~min(.x, na.rm = TRUE),
+        max = ~max(.x, na.rm = TRUE)
+      ),
+      .names = "{.col}_{.fn}"
+    )
+  )
+```
+
+### Syntax notes (new pattern)
+
+- **`across()`** applies the same operations to multiple columns.
+- **`.fns = list(...)`** defines several summary functions at once.
+- **`.names = "{.col}_{.fn}"`** controls output column names.
+- **`na.rm = TRUE`** excludes missing values from computations.
+
+Notable options to explore:
+
+- Use **`across(where(is.numeric), ...)`** when you want to summarize all numeric columns automatically.
+- Use **`round()`** inside summary functions (or after summarization) when preparing reader-facing tables.
+
+::: {.callout-tip}
+## Practical reporting note
+
+For skewed biomedical variables (e.g., insulin), median and IQR are often more robust than mean and SD.
+:::
+
+
+## 2) Categorical Variables: n and %
+
+For categorical variables, report frequencies and proportions.
+
+```{r}
+diabetes |>
+  count(diabetes_5y)
+```
+
+```{r}
+diabetes |>
+  count(diabetes_5y) |>
+  mutate(prop_pct = 100 * n / sum(n))
+```
+
+Now a grouped categorical example:
+
+```{r}
+diabetes |>
+  count(diabetes_5y, bmi_class) |>
+  group_by(diabetes_5y) |>
+  mutate(prop_pct = 100 * n / sum(n)) |>
+  ungroup()
+```
+
+### Syntax notes
+
+- **`count(a, b)`** is a compact form of `group_by(a, b) |> summarise(n = n())`.
+- **`mutate(prop_pct = ...)`** computes percentages explicitly.
+- Always ensure the denominator is clear (`sum(n)` within each group).
+
+Notable options to explore:
+
+- **`count(..., sort = TRUE)`** sorts counts from highest to lowest.
+- **`count(..., name = "freq")`** customizes the count column name.
+
+
+## 3) Grouped Descriptive Summaries
+
+A common clinical workflow is to summarize key variables by outcome group.
+
+```{r}
+diabetes |>
+  group_by(diabetes_5y) |>
+  summarise(
+    n = n(),
+    mean_age = mean(age, na.rm = TRUE),
+    mean_bmi = mean(bmi, na.rm = TRUE),
+    mean_glucose = mean(glucose_mg_dl, na.rm = TRUE),
+    median_glucose = median(glucose_mg_dl, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+### Syntax notes
+
+- **`group_by(diabetes_5y)`** performs summaries within each outcome group.
+- **`.groups = "drop"`** returns an ungrouped tibble after summarization, which avoids accidental carry-over of grouping in later code.
+
+This produces a concise group-level profile and is often the first summary table used in reporting.
+
+
+## 4) Missing Data Summary (Implementation Pattern)
+
+Missing data should be explicitly reported.
+
+```{r}
+missingness_tbl <- tibble(variable = names(diabetes)) |>
+  mutate(
+    n_missing = map_int(variable, ~sum(is.na(diabetes[[.x]]))),
+    pct_missing = 100 * n_missing / nrow(diabetes)
+  ) |>
+  arrange(desc(pct_missing))
+
+missingness_tbl
+```
+
+```{r}
+missingness_tbl |>
+  slice_head(n = 5)
+```
+
+Notable option to explore:
+
+- For numeric-only missing checks, you can also use a compact pattern such as `summarise(across(where(is.numeric), ~sum(is.na(.x))))`.
+
+This pattern is simple, transparent, and useful in methods/results sections.
+
+
+## 5) Publication-Ready Baseline Table with `gtsummary`
+
+At this point, we have the core summaries. Now we format them for publication-style presentation.
+
+```{r}
+diabetes |>
+  select(diabetes_5y, age, bmi, glucose_mg_dl, dbp_mm_hg, bmi_class) |>
+  tbl_summary(
+    by = diabetes_5y,
+    statistic = list(
+      all_continuous() ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = all_continuous() ~ 1,
+    missing = "ifany",
+    label = list(
+      age ~ "Age (years)",
+      bmi ~ "Body mass index (kg/m^2)",
+      glucose_mg_dl ~ "Glucose (mg/dL)",
+      dbp_mm_hg ~ "Diastolic blood pressure (mmHg)",
+      bmi_class ~ "BMI class"
+    )
+  ) |>
+  add_overall(last = TRUE) |>
+  bold_labels()
+```
+
+### Syntax notes
+
+- **`tbl_summary(by = ...)`** creates a stratified baseline table.
+- **`statistic = list(...)`** controls display format.
+- **`add_overall()`** adds the overall cohort column.
+- **`bold_labels()`** improves readability.
+
+Notable options to explore:
+
+- For skewed variables, you may prefer `all_continuous() ~ "{median} ({p25}, {p75})"`.
+- `missing = "no"` hides missing rows; `missing = "always"` always shows them.
+- In inferential chapters, `add_p()` can be added when you are ready to report statistical tests.
+
+::: {.callout-note}
+## Optional extension
+
+If you want to export this table to file formats (HTML/Word), you can convert it with `as_gt()` and save with `gt` workflows.
+:::
+
+
+## End-to-End Mini Workflow
+
+A compact implementation pattern for descriptive reporting:
+
+```{r}
+diabetes |>
+  filter(glucose_mg_dl > 0, bmi > 0) |>
+  group_by(diabetes_5y) |>
+  summarise(
+    n = n(),
+    mean_glucose = mean(glucose_mg_dl, na.rm = TRUE),
+    mean_bmi = mean(bmi, na.rm = TRUE),
+    .groups = "drop"
+  )
+```
+
+Then convert to a publication-ready table with `tbl_summary()` when needed.
+
+
+## Summary
+
+| Task | Recommended R pattern |
+|---|---|
+| Continuous summaries | `summarise(across(...))` |
+| Categorical summaries | `count(...)` + percentage with `mutate()` |
+| Grouped summaries | `group_by(...)` + `summarise(...)` |
+| Missingness | `is.na()` + variable-wise tally |
+| Publication-ready baseline table | `gtsummary::tbl_summary()` |
+
+In the next chapter, we move from descriptive summaries to **inferential comparison for two groups**.
+
+
+## Exercises {.unnumbered}
+
+1. **Continuous summary practice.** Using `summarise(across())`, compute mean, SD, median, and IQR for `age`, `bmi`, and `glucose_mg_dl`.
+
+2. **Categorical profile.** Report n (%) of `bmi_class` overall and stratified by `diabetes_5y`.
+
+3. **Missingness table.** Create a table with `variable`, `n_missing`, and `pct_missing`, sorted descending by `pct_missing`.
+
+4. **Baseline table challenge.** Build a `gtsummary` table stratified by `diabetes_5y`, include at least four variables, and use custom labels with one decimal for continuous summaries.
+
+Solutions will be provided in Appendix C.

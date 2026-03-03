@@ -20,6 +20,9 @@ book:
     - part: "Data Visualization"
       chapters:
         - contents/chapters/05-ggplot2.qmd
+    - part: "Descriptive Statistics"
+      chapters:
+        - contents/chapters/06-descriptive-statistics.qmd
     - references.qmd
 
 bibliography: references.bib
