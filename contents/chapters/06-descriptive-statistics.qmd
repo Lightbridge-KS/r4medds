@@ -1,33 +1,33 @@
 # Descriptive Statistics
 
-In this chapter, we focus on practical implementation of descriptive statistics in R. The emphasis is on reusable coding patterns for clinical datasets, rather than detailed statistical theory.
+Before running any statistical test, you need to **describe** your data. How old are the patients? What is the distribution of glucose? How much data is missing? Is the cohort balanced across groups?
 
-By the end of this chapter, you should be able to quickly generate:
-
-- continuous-variable summaries,
-- categorical n (%) summaries,
-- grouped summaries by outcome,
-- missingness reports,
-- and a publication-ready baseline table.
+In this chapter, you'll learn to compute and present descriptive summaries --- the kind you'd include in a methods section, a departmental presentation, or a publication's "Table 1."
 
 ```{r}
 #| message: false
-#| warning: false
 library(tidyverse)
 library(janitor)
 library(gtsummary)
 ```
 
 ::: {.callout-note}
-## Running example: diabetes registry summary
+## Our running example: Summarizing the diabetes cohort
 
-We will continue using `data/diabetes.csv` and answer one practical question:
+Imagine you're preparing a summary for a departmental meeting. You need to describe the 768 patients in the diabetes registry:
 
-**How can we summarize this cohort in a clear, reproducible, report-ready format?**
+- What are the typical values for age, BMI, and glucose?
+- How many patients developed diabetes within 5 years?
+- How much data is missing?
+- Can you produce a single, publication-ready table?
+
+We'll answer each of these questions step by step.
 :::
 
 
-## Data Setup for This Chapter
+## Data Preparation
+
+We load and prepare the diabetes data using the same tools from Chapters 4 and 5:
 
 ```{r}
 diabetes_raw <- read_csv("../../data/diabetes.csv", show_col_types = FALSE)
@@ -38,172 +38,345 @@ diabetes <- diabetes_raw |>
     diabetes_5y = fct_relevel(diabetes_5y, "neg", "pos"),
     bmi_class = case_when(
       bmi < 18.5 ~ "Underweight",
-      bmi < 25 ~ "Normal",
-      bmi < 30 ~ "Overweight",
-      TRUE ~ "Obesity"
+      bmi < 25   ~ "Normal",
+      bmi < 30   ~ "Overweight",
+      .default   = "Obesity"
     ) |> factor(levels = c("Underweight", "Normal", "Overweight", "Obesity"))
   )
-
-glimpse(diabetes)
 ```
 
-### Syntax notes (data setup)
 
-- **`clean_names()`** standardizes variable names for easier coding.
-- **`fct_relevel(diabetes_5y, "neg", "pos")`** sets category order explicitly.
-- **`case_when(...)`** creates a new categorical variable using rule-based conditions.
-- **`factor(levels = ...)`** fixes display/reporting order for categories.
+## Choosing the Right Summary Statistics
+
+Before computing anything, it helps to know **which statistics suit which data**. The choice depends on the variable type and its distribution:
+
+| Variable Type | Symmetric Distribution | Skewed Distribution |
+|---|---|---|
+| **Continuous** (e.g., age, BMI) | Mean and SD | Median and IQR |
+| **Categorical** (e.g., sex, outcome) | n and % | n and % |
+
+: Choosing the right summary statistics {.striped}
+
+For continuous variables, here's what each statistic measures:
+
+| Statistic | What it measures | R function |
+|---|---|---|
+| Mean | Average (center of gravity) | `mean()` |
+| SD (standard deviation) | Spread around the mean | `sd()` |
+| Median | Middle value (50th percentile) | `median()` |
+| IQR (interquartile range) | Spread of the middle 50% | `IQR()` |
+| Min / Max | Extremes | `min()`, `max()` |
+
+: Common summary statistics and their R functions {.striped}
+
+::: {.callout-tip}
+## Mean + SD vs Median + IQR
+
+- Use **Mean + SD** when the data is roughly symmetric (bell-shaped)
+- Use **Median + IQR** when the data is skewed (long tail on one side) or has outliers
+
+For clinical data, many variables (like insulin, length of stay, costs) are right-skewed, making median + IQR the safer default. When in doubt, check with a histogram (@sec-ggplot2).
+:::
 
 
-## 1) Continuous Variables: Fast Summary in R
+## Summarizing Continuous Variables
 
-For continuous variables, the most common descriptive statistics are:
+### Single variable summary
 
-- mean and standard deviation (SD),
-- median and interquartile range (IQR),
-- minimum and maximum.
-
-### Single variable example
+Let's start with glucose. You can call summary functions directly, just like in @sec-vectors:
 
 ```{r}
 mean(diabetes$glucose_mg_dl, na.rm = TRUE)
+```
+
+```{r}
 sd(diabetes$glucose_mg_dl, na.rm = TRUE)
+```
+
+```{r}
 median(diabetes$glucose_mg_dl, na.rm = TRUE)
+```
+
+```{r}
 IQR(diabetes$glucose_mg_dl, na.rm = TRUE)
 ```
 
-### Multiple variables with one reusable pattern
+Recall from @sec-na that `na.rm = TRUE` tells R to skip missing values when computing the statistic.
+
+### Summarizing multiple variables
+
+To summarize several variables at once, use `summarise()` with one line per statistic:
+
+```{r}
+diabetes |>
+  summarise(
+    mean_age      = mean(age, na.rm = TRUE),
+    sd_age        = sd(age, na.rm = TRUE),
+    mean_bmi      = mean(bmi, na.rm = TRUE),
+    sd_bmi        = sd(bmi, na.rm = TRUE),
+    mean_glucose  = mean(glucose_mg_dl, na.rm = TRUE),
+    sd_glucose    = sd(glucose_mg_dl, na.rm = TRUE)
+  )
+```
+
+This is verbose but completely transparent --- you can see exactly what's being computed for each variable.
+
+::: {.callout-tip collapse="true"}
+## Shortcut: `across()` for many columns
+
+When you have many columns to summarize, the `across()` function can save typing. This uses more advanced syntax that we won't cover in detail --- just know it exists:
 
 ```{r}
 diabetes |>
   summarise(
     across(
-      .cols = c(age, bmi, glucose_mg_dl, dbp_mm_hg),
-      .fns = list(
-        n = ~sum(!is.na(.x)),
-        mean = ~mean(.x, na.rm = TRUE),
-        sd = ~sd(.x, na.rm = TRUE),
-        median = ~median(.x, na.rm = TRUE),
-        iqr = ~IQR(.x, na.rm = TRUE),
-        min = ~min(.x, na.rm = TRUE),
-        max = ~max(.x, na.rm = TRUE)
-      ),
-      .names = "{.col}_{.fn}"
+      c(age, bmi, glucose_mg_dl),
+      list(mean = \(x) mean(x, na.rm = TRUE),
+           sd   = \(x) sd(x, na.rm = TRUE))
     )
   )
 ```
 
-### Syntax notes (new pattern)
+The column-by-column approach above is perfectly fine for most analyses. Use `across()` when you're comfortable with it.
+:::
 
-- **`across()`** applies the same operations to multiple columns.
-- **`.fns = list(...)`** defines several summary functions at once.
-- **`.names = "{.col}_{.fn}"`** controls output column names.
-- **`na.rm = TRUE`** excludes missing values from computations.
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python's pandas provides `describe()` for quick summaries:
 
-Notable options to explore:
+```python
+diabetes[["age", "bmi", "glucose_mg_dl"]].describe()
+```
 
-- Use **`across(where(is.numeric), ...)`** when you want to summarize all numeric columns automatically.
-- Use **`round()`** inside summary functions (or after summarization) when preparing reader-facing tables.
-
-::: {.callout-tip}
-## Practical reporting note
-
-For skewed biomedical variables (e.g., insulin), median and IQR are often more robust than mean and SD.
+This returns count, mean, std, min, percentiles, and max --- similar to combining `mean()`, `sd()`, `median()`, `min()`, `max()` in R.
 :::
 
 
-## 2) Categorical Variables: n and %
+## Summarizing Categorical Variables
 
-For categorical variables, report frequencies and proportions.
+### Frequency table with `count()`
+
+For categorical variables, the key statistics are **n** (count) and **%** (proportion). Use `count()` from @sec-summarise:
 
 ```{r}
-diabetes |>
-  count(diabetes_5y)
+diabetes |> count(diabetes_5y)
 ```
+
+### Adding percentages
+
+Add a percentage column with `mutate()`:
 
 ```{r}
 diabetes |>
   count(diabetes_5y) |>
-  mutate(prop_pct = 100 * n / sum(n))
+  mutate(pct = round(100 * n / sum(n), 1))
 ```
 
-Now a grouped categorical example:
+About 35% of patients in this cohort developed diabetes within 5 years.
+
+### Stratified frequency table
+
+To see how one categorical variable breaks down **within** another group, use `count()` with two variables and then compute within-group percentages:
 
 ```{r}
 diabetes |>
   count(diabetes_5y, bmi_class) |>
   group_by(diabetes_5y) |>
-  mutate(prop_pct = 100 * n / sum(n)) |>
+  mutate(pct = round(100 * n / sum(n), 1)) |>
   ungroup()
 ```
 
-### Syntax notes
+::: {.callout-warning}
+## Watch your denominator
 
-- **`count(a, b)`** is a compact form of `group_by(a, b) |> summarise(n = n())`.
-- **`mutate(prop_pct = ...)`** computes percentages explicitly.
-- Always ensure the denominator is clear (`sum(n)` within each group).
+When computing percentages, be clear about **what the denominator is**:
 
-Notable options to explore:
+- `sum(n)` after `group_by(diabetes_5y)` → percentages **within each outcome group** (columns sum to 100%)
+- `sum(n)` without grouping → percentages **of the total cohort** (all rows sum to 100%)
 
-- **`count(..., sort = TRUE)`** sorts counts from highest to lowest.
-- **`count(..., name = "freq")`** customizes the count column name.
+Getting the denominator wrong is one of the most common mistakes in clinical reporting.
+:::
 
 
-## 3) Grouped Descriptive Summaries
+## Grouped Summaries by Outcome
 
-A common clinical workflow is to summarize key variables by outcome group.
+A key step in any clinical analysis: summarize continuous variables **by group** to see how the groups compare.
+
+### Continuous variables by group
 
 ```{r}
 diabetes |>
   group_by(diabetes_5y) |>
   summarise(
-    n = n(),
-    mean_age = mean(age, na.rm = TRUE),
-    mean_bmi = mean(bmi, na.rm = TRUE),
-    mean_glucose = mean(glucose_mg_dl, na.rm = TRUE),
-    median_glucose = median(glucose_mg_dl, na.rm = TRUE),
+    n            = n(),
+    mean_age     = round(mean(age, na.rm = TRUE), 1),
+    sd_age       = round(sd(age, na.rm = TRUE), 1),
+    mean_glucose = round(mean(glucose_mg_dl, na.rm = TRUE), 1),
+    sd_glucose   = round(sd(glucose_mg_dl, na.rm = TRUE), 1),
+    mean_bmi     = round(mean(bmi, na.rm = TRUE), 1),
+    sd_bmi       = round(sd(bmi, na.rm = TRUE), 1),
     .groups = "drop"
   )
 ```
 
-### Syntax notes
+### Interpreting group differences
 
-- **`group_by(diabetes_5y)`** performs summaries within each outcome group.
-- **`.groups = "drop"`** returns an ungrouped tibble after summarization, which avoids accidental carry-over of grouping in later code.
+The `pos` group is older on average (37 vs 31 years), has higher mean glucose (142 vs 110 mg/dL), and higher mean BMI (35 vs 30 kg/m²). These differences are descriptive --- we haven't tested whether they're statistically significant. That comes in the next chapters.
 
-This produces a concise group-level profile and is often the first summary table used in reporting.
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python's `groupby` + `agg` achieves the same result:
+
+```python
+(
+    diabetes
+    .groupby("diabetes_5y")
+    .agg(
+        n=("age", "size"),
+        mean_age=("age", "mean"),
+        mean_glucose=("glucose_mg_dl", "mean"),
+        mean_bmi=("bmi", "mean")
+    )
+    .round(1)
+)
+```
+:::
 
 
-## 4) Missing Data Summary (Implementation Pattern)
+## Assessing Missing Data
 
-Missing data should be explicitly reported.
+### Why report missingness?
+
+Missing data is common in clinical datasets and can bias your results. Reporting how much data is missing --- and in which variables --- is essential for transparency. Journals and reviewers expect it.
+
+### Counting missing values per variable
+
+The simplest approach: use `summarise()` with `is.na()` for each column you care about:
 
 ```{r}
-missingness_tbl <- tibble(variable = names(diabetes)) |>
-  mutate(
-    n_missing = map_int(variable, ~sum(is.na(diabetes[[.x]]))),
-    pct_missing = 100 * n_missing / nrow(diabetes)
-  ) |>
+diabetes |>
+  summarise(
+    glucose_missing     = sum(is.na(glucose_mg_dl)),
+    dbp_missing         = sum(is.na(dbp_mm_hg)),
+    triceps_missing     = sum(is.na(triceps_mm)),
+    insulin_missing     = sum(is.na(insulin_microiu_ml)),
+    bmi_missing         = sum(is.na(bmi))
+  )
+```
+
+`sum(is.na(x))` counts the `TRUE`s --- recall from @sec-logical-ops that `TRUE` counts as 1. So `sum(is.na(x))` is literally "how many values are NA?"
+
+### A missingness summary table
+
+For a cleaner report, build a tibble with variable names, counts, and percentages:
+
+```{r}
+miss_table <- tibble(
+  variable    = c("glucose_mg_dl", "dbp_mm_hg", "triceps_mm",
+                  "insulin_microiu_ml", "bmi"),
+  n_missing   = c(
+    sum(is.na(diabetes$glucose_mg_dl)),
+    sum(is.na(diabetes$dbp_mm_hg)),
+    sum(is.na(diabetes$triceps_mm)),
+    sum(is.na(diabetes$insulin_microiu_ml)),
+    sum(is.na(diabetes$bmi))
+  ),
+  pct_missing = round(100 * n_missing / nrow(diabetes), 1)
+) |>
   arrange(desc(pct_missing))
 
-missingness_tbl
+miss_table
 ```
+
+::: {.callout-tip collapse="true"}
+## Shortcut: using `across()` for missingness
+
+For many columns, you can compute missingness more compactly:
 
 ```{r}
-missingness_tbl |>
-  slice_head(n = 5)
+diabetes |>
+  summarise(across(everything(), \(x) sum(is.na(x))))
 ```
 
-Notable option to explore:
+This applies `sum(is.na())` to every column at once. Handy when you have dozens of variables.
+:::
 
-- For numeric-only missing checks, you can also use a compact pattern such as `summarise(across(where(is.numeric), ~sum(is.na(.x))))`.
+### Interpretation
 
-This pattern is simple, transparent, and useful in methods/results sections.
+Insulin has ~49% missing and triceps has ~30% missing --- that's substantial. When analyzing these variables, you'll need to consider whether the missingness is random or systematic. At a minimum, report it clearly.
 
 
-## 5) Publication-Ready Baseline Table with `gtsummary`
+## Publication-Ready Tables with `gtsummary` {#sec-gtsummary}
 
-At this point, we have the core summaries. Now we format them for publication-style presentation.
+So far, we've built summaries manually with `summarise()`. That works well for understanding the data, but for a **publication-quality "Table 1"**, the `gtsummary` package automates the formatting.
+
+::: {.callout-note}
+## One function, one Table 1
+
+`tbl_summary()` takes a data frame and produces a formatted summary table --- the kind you'd include in a journal article's "Baseline Characteristics" table. It handles continuous and categorical variables automatically.
+:::
+
+### Step 1: The simplest table
+
+Start with just the defaults --- no customization at all:
+
+```{r}
+diabetes |>
+  select(age, bmi, glucose_mg_dl, diabetes_5y) |>
+  tbl_summary()
+```
+
+With one function call, `gtsummary` detected variable types, computed appropriate statistics (median + IQR for continuous, n + % for categorical), and formatted everything.
+
+### Step 2: Stratify by outcome
+
+Add `by = diabetes_5y` to split the table by group:
+
+```{r}
+diabetes |>
+  select(diabetes_5y, age, bmi, glucose_mg_dl, bmi_class) |>
+  tbl_summary(by = diabetes_5y)
+```
+
+Now each column is a group, and you can compare at a glance.
+
+### Step 3: Customize the statistics
+
+By default, `gtsummary` reports median (IQR) for continuous variables. To switch to mean (SD), use the `statistic` argument:
+
+```{r}
+diabetes |>
+  select(diabetes_5y, age, bmi, glucose_mg_dl, bmi_class) |>
+  tbl_summary(
+    by = diabetes_5y,
+    statistic = list(
+      all_continuous()  ~ "{mean} ({sd})",
+      all_categorical() ~ "{n} ({p}%)"
+    ),
+    digits = all_continuous() ~ 1
+  )
+```
+
+Let's break down the new syntax:
+
+- **`statistic = list(...)`** --- controls what statistics are displayed. Each entry maps a set of variables to a template string.
+- **Template strings** use `{placeholder}` syntax:
+
+| Placeholder | Meaning |
+|---|---|
+| `{mean}` | Mean |
+| `{sd}` | Standard deviation |
+| `{median}` | Median |
+| `{p25}`, `{p75}` | 25th and 75th percentiles |
+| `{n}` | Count |
+| `{p}` | Percentage |
+
+: `gtsummary` template placeholders {.striped}
+
+- **`all_continuous()`** and **`all_categorical()`** are **selector helpers** --- they select all continuous or all categorical variables, similar to how `starts_with()` works in `select()`. Think of them as shortcuts for "apply this format to all variables of this type."
+- **`digits = all_continuous() ~ 1`** --- round continuous statistics to 1 decimal place.
+
+### Step 4: Add labels and polish
+
+Add readable labels, an overall column, and bold formatting:
 
 ```{r}
 diabetes |>
@@ -211,83 +384,114 @@ diabetes |>
   tbl_summary(
     by = diabetes_5y,
     statistic = list(
-      all_continuous() ~ "{mean} ({sd})",
+      all_continuous()  ~ "{mean} ({sd})",
       all_categorical() ~ "{n} ({p}%)"
     ),
     digits = all_continuous() ~ 1,
     missing = "ifany",
     label = list(
-      age ~ "Age (years)",
-      bmi ~ "Body mass index (kg/m^2)",
+      age           ~ "Age (years)",
+      bmi           ~ "Body mass index (kg/m²)",
       glucose_mg_dl ~ "Glucose (mg/dL)",
-      dbp_mm_hg ~ "Diastolic blood pressure (mmHg)",
-      bmi_class ~ "BMI class"
+      dbp_mm_hg     ~ "Diastolic BP (mmHg)",
+      bmi_class     ~ "BMI class"
     )
   ) |>
   add_overall(last = TRUE) |>
   bold_labels()
 ```
 
-### Syntax notes
+New pieces:
 
-- **`tbl_summary(by = ...)`** creates a stratified baseline table.
-- **`statistic = list(...)`** controls display format.
-- **`add_overall()`** adds the overall cohort column.
-- **`bold_labels()`** improves readability.
+- **`label = list(variable ~ "Label")`** --- gives each variable a human-readable name
+- **`missing = "ifany"`** --- shows a "Missing" row only when there are actually missing values. Other options: `"no"` (hide missing rows) or `"always"` (always show)
+- **`add_overall(last = TRUE)`** --- adds an "Overall" column at the end
+- **`bold_labels()`** --- makes variable names bold for readability
 
-Notable options to explore:
-
-- For skewed variables, you may prefer `all_continuous() ~ "{median} ({p25}, {p75})"`.
-- `missing = "no"` hides missing rows; `missing = "always"` always shows them.
-- In inferential chapters, `add_p()` can be added when you are ready to report statistical tests.
+This is a complete Table 1 --- ready for a report, slide deck, or journal submission.
 
 ::: {.callout-note}
-## Optional extension
+## Exporting your table
 
-If you want to export this table to file formats (HTML/Word), you can convert it with `as_gt()` and save with `gt` workflows.
+To save the table as an HTML or Word file:
+
+```{r}
+#| eval: false
+library(gt)
+
+diabetes |>
+  select(diabetes_5y, age, bmi, glucose_mg_dl) |>
+  tbl_summary(by = diabetes_5y) |>
+  as_gt() |>
+  gtsave("table1.html")     # or "table1.docx" for Word
+```
+
+The `as_gt()` function converts the `gtsummary` table to a `gt` object, which can be saved in various formats.
+:::
+
+::: {.callout-note}
+## What about p-values?
+
+You may notice that Table 1 often includes a "p-value" column comparing groups. In `gtsummary`, you add this with `add_p()`. We'll cover this in the inferential statistics chapters --- for now, focus on describing the data clearly.
+:::
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python's `tableone` package provides similar functionality:
+
+```python
+from tableone import TableOne
+
+table1 = TableOne(
+    data=diabetes,
+    columns=["age", "bmi", "glucose_mg_dl", "bmi_class"],
+    groupby="diabetes_5y",
+    pval=False
+)
+print(table1.tabulate(tablefmt="github"))
+```
+
+R's `gtsummary` is generally more polished for publication-ready output, with built-in formatting and export options.
 :::
 
 
-## End-to-End Mini Workflow
+## Common Errors and Troubleshooting
 
-A compact implementation pattern for descriptive reporting:
+| Error or Symptom | Cause | Fix |
+|---|---|---|
+| `NaN` in mean or SD | All values are `NA` in that subset | Check your `filter()` --- are you accidentally removing all data? |
+| Wrong percentages (don't sum to 100%) | Wrong `group_by()` before `mutate(pct = ...)` | Check your grouping --- denominator must match your intended total |
+| `gtsummary` shows "Unknown" category | `NA` values in a categorical variable | Use `mutate(var = fct_na_value_to_level(var))` or `missing = "no"` |
+| `na.rm` forgotten | `NA` result from `mean()`, `sd()`, etc. | Add `na.rm = TRUE` to every summary function |
+| Very wide output from `summarise()` | Too many columns in one `summarise()` call | Break into separate summaries or use `gtsummary` instead |
 
-```{r}
-diabetes |>
-  filter(glucose_mg_dl > 0, bmi > 0) |>
-  group_by(diabetes_5y) |>
-  summarise(
-    n = n(),
-    mean_glucose = mean(glucose_mg_dl, na.rm = TRUE),
-    mean_bmi = mean(bmi, na.rm = TRUE),
-    .groups = "drop"
-  )
-```
-
-Then convert to a publication-ready table with `tbl_summary()` when needed.
+: Common descriptive statistics errors and their fixes {.striped}
 
 
 ## Summary
 
-| Task | Recommended R pattern |
-|---|---|
-| Continuous summaries | `summarise(across(...))` |
-| Categorical summaries | `count(...)` + percentage with `mutate()` |
-| Grouped summaries | `group_by(...)` + `summarise(...)` |
-| Missingness | `is.na()` + variable-wise tally |
-| Publication-ready baseline table | `gtsummary::tbl_summary()` |
+Here's the journey we took to describe the diabetes cohort:
 
-In the next chapter, we move from descriptive summaries to **inferential comparison for two groups**.
+| Step | What we did | R tool |
+|---|---|---|
+| Choose statistics | Matched measure to data type | Mean + SD vs Median + IQR |
+| Single variable | Computed glucose statistics | `mean()`, `sd()`, `median()`, `IQR()` |
+| Multiple variables | Summarized age, BMI, glucose | `summarise()` column-by-column |
+| Categorical counts | Frequency of outcome and BMI class | `count()`, `mutate(pct = ...)` |
+| Grouped summaries | Compared pos vs neg groups | `group_by()` + `summarise()` |
+| Missingness | Identified insulin as 49% missing | `sum(is.na())` per variable |
+| Table 1 | Publication-ready baseline table | `gtsummary::tbl_summary()` |
+
+: Chapter 6 journey --- from raw numbers to a publication-ready Table 1 {.striped}
+
+These descriptive statistics are the foundation for any clinical analysis. In the next chapters, we'll move to **inferential statistics** --- testing whether the differences we've observed between groups are statistically significant.
 
 
 ## Exercises {.unnumbered}
 
-1. **Continuous summary practice.** Using `summarise(across())`, compute mean, SD, median, and IQR for `age`, `bmi`, and `glucose_mg_dl`.
+1. **Vital signs summary.** Using the diabetes dataset, compute the mean, SD, median, and IQR of `age`, `bmi`, and `dbp_mm_hg` using explicit `summarise()` (one line per statistic). Round to 1 decimal.
 
-2. **Categorical profile.** Report n (%) of `bmi_class` overall and stratified by `diabetes_5y`.
+2. **Categorical profile.** Create a frequency table of `bmi_class` with percentages. Then create a stratified version by `diabetes_5y` showing within-group percentages. Which BMI class is most common in the `pos` group?
 
-3. **Missingness table.** Create a table with `variable`, `n_missing`, and `pct_missing`, sorted descending by `pct_missing`.
+3. **Missingness report.** Build a missingness summary table for all numeric columns in the diabetes dataset. Sort by percent missing (highest first). Which variable has the most missing data, and what percentage is missing?
 
-4. **Baseline table challenge.** Build a `gtsummary` table stratified by `diabetes_5y`, include at least four variables, and use custom labels with one decimal for continuous summaries.
-
-Solutions will be provided in Appendix C.
+4. **Table 1 challenge.** Build a `gtsummary` table stratified by `diabetes_5y` that includes `age`, `bmi`, `glucose_mg_dl`, `dbp_mm_hg`, and `bmi_class`. Use mean (SD) for continuous variables, custom labels with units, and add an overall column. Export it to HTML if you'd like to practice with `as_gt()`.

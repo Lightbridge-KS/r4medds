@@ -1,45 +1,44 @@
-# Data Visualization with ggplot2
+# Data Visualization with ggplot2 {#sec-ggplot2}
 
-In the previous chapter, we learned how to import, inspect, and transform data. In this chapter, we move to the next core skill: **visualization**.
+In the previous chapter, we learned to import, clean, and transform data. Now it's time to **see** it. A well-made figure often reveals patterns that tables alone cannot --- outliers, skewed distributions, group differences, and relationships between variables.
 
-For many beginners, `ggplot2` feels difficult at first because of its layered syntax. That is normal. We will move step by step and explain every new concept before using it.
+For many beginners, `ggplot2` feels unusual at first because of its layered syntax. That's normal. We'll build up one layer at a time, explaining each new piece before using it.
 
 ```{r}
 #| message: false
-#| warning: false
 library(tidyverse)
 library(janitor)
-library(ggsci)
-library(palmerpenguins)
 ```
 
 ::: {.callout-note}
-## Our running example: visualizing a diabetes registry
+## Our running example: Visualizing a diabetes cohort
 
-Throughout this chapter, we will use `data/diabetes.csv` as our main dataset.
+Throughout this chapter, we'll use the diabetes dataset to answer practical questions:
 
-Our guiding questions are practical:
-
-- How are glucose values distributed?
-- How do distributions differ by diabetes outcome?
+- How are glucose values distributed in this cohort?
+- Do distributions differ by diabetes outcome?
 - How does BMI relate to glucose?
-- How do we present this clearly in a professional setting?
+- How can we present findings clearly for a meeting or publication?
+
+Each plot will answer one question, and each section introduces one new ggplot2 concept.
 :::
 
 
 ## Why Visualization Matters in Clinical Work
 
-A table is precise, but a figure is often faster to interpret. Good visualizations help us:
+A table of 768 rows is precise, but a figure is faster to interpret. Good visualizations help us:
 
-1. detect patterns and outliers,
-2. compare groups,
-3. communicate clearly with teams,
-4. prepare publication- or presentation-ready outputs.
+1. Detect **patterns and outliers** that numbers alone may hide
+2. **Compare groups** at a glance
+3. **Communicate clearly** with clinical teams and stakeholders
+4. Prepare **publication-** or **presentation-ready** outputs
 
-In clinical analytics, clear figures reduce misunderstanding and improve decision-making.
+In clinical analytics, a clear figure can prevent misunderstandings that a dense table might cause.
 
 
-## Before Plotting: Prepare the Data
+## Data Preparation
+
+We load and prepare the diabetes data using tools from @sec-import and @sec-mutate. This block applies the same steps you learned in Chapter 4:
 
 ```{r}
 diabetes_raw <- read_csv("../../data/diabetes.csv", show_col_types = FALSE)
@@ -50,326 +49,600 @@ diabetes <- diabetes_raw |>
     diabetes_5y = fct_relevel(diabetes_5y, "neg", "pos"),
     bmi_class = case_when(
       bmi < 18.5 ~ "Underweight",
-      bmi < 25 ~ "Normal",
-      bmi < 30 ~ "Overweight",
-      TRUE ~ "Obesity"
+      bmi < 25   ~ "Normal",
+      bmi < 30   ~ "Overweight",
+      .default   = "Obesity"
     ) |> factor(levels = c("Underweight", "Normal", "Overweight", "Obesity"))
   )
-
-glimpse(diabetes)
 ```
 
-### New helper functions used above
-
-We introduced three functions that are important for plotting workflows:
-
-- **`clean_names()`** (`janitor`)  
-  standardizes column names to a coding-friendly style.
-- **`fct_relevel()`** (`forcats`)  
-  sets factor order explicitly (so plot order is controlled).
-- **`drop_na()`** (`tidyr`, used later)  
-  removes rows with missing values in selected columns.
-
-::: {.callout-tip}
-## Practical pre-plot checklist
-
-Before making any plot, check:
-
-1. `names(data)`
-2. `glimpse(data)`
-3. `summary(data)`
-
-This catches many errors early.
-:::
+Everything here --- `read_csv()`, `clean_names()`, `fct_relevel()`, `case_when()`, `factor()` --- was taught in the previous chapter.
 
 
-## The ggplot2 Mental Model (Teach Before Use)
+## The Grammar of Graphics {#sec-grammar-of-graphics}
 
-Most plots follow this structure:
+`ggplot2` is built on a simple idea: every plot is made of **layers**, and each layer has three components:
+
+| Component | What it does | Example |
+|---|---|---|
+| **Data** | The dataset to plot | `diabetes` |
+| **Aesthetics** (`aes`) | Map variables to visual properties | `x = age`, `y = glucose_mg_dl`, `color = diabetes_5y` |
+| **Geometry** (`geom`) | How to draw the data | Points, bars, boxes, lines |
+
+: The three ingredients of a ggplot2 plot {.striped}
+
+### The minimal plot template
+
+Every ggplot2 plot starts with this pattern:
 
 ```r
-ggplot(data = my_data, aes(x = ..., y = ...)) +
+ggplot(data, aes(x = ..., y = ...)) +
   geom_*()
 ```
 
-Let’s break this down:
+Let's break it down:
 
-- **`ggplot(data = ...)`** --- choose the dataset.
-- **`aes(...)`** --- map variables to visual properties.
-  - `x` and `y` are most common.
-  - `color` and `fill` are also common.
-- **`geom_*()`** --- choose how to draw marks (bars, points, boxes, etc.).
-- **`+`** --- add layers to the plot.
+- **`ggplot(data, aes(...))`** --- creates the plot canvas. `data` is your tibble, `aes()` maps columns to visual properties.
+- **`aes(x = ..., y = ...)`** --- the **aesthetic mapping**. Think of it as "which variable goes where." Common mappings: `x`, `y`, `color`, `fill`, `size`.
+- **`+ geom_*()`** --- adds a **geometry layer** that draws the data (histogram bars, scatter points, box plots, etc.)
+- **`+`** --- the "add a layer" operator. Each `+` adds something to the plot.
 
-Think: **data + mapping + geometry + layers**.
+### Why `+` instead of `|>`?
 
-### Why `+` appears at the end of lines
+In data manipulation, we use `|>` to chain operations. In ggplot2, we use `+` to add layers. They look similar but mean different things:
 
-In `ggplot2`, each `+` means "add the next layer." Writing one layer per line makes code easier to read.
+- **`|>`** = "**then** do this to the data"
+- **`+`** = "**also** draw this on the plot"
 
-```r
-ggplot(...) +
-  geom_...() +
-  labs(...) +
-  theme_...()
+::: {.callout-warning}
+## Don't mix `+` and `|>`
+
+A common beginner mistake is using `|>` inside ggplot2 code. Remember: `|>` is for data pipelines, `+` is for plot layers. If you see an error like *"object '+' not found"* or *"did you accidentally use `|>` instead of `+`"*, check your operators.
+:::
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python's `matplotlib` and `seaborn` take a different approach --- instead of layering with `+`, you call separate functions:
+
+```python
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# seaborn (high-level, similar philosophy to ggplot2)
+sns.histplot(data=diabetes, x="glucose_mg_dl", bins=20)
+plt.title("Distribution of Glucose")
+plt.show()
 ```
 
+R's `ggplot2` and Python's `seaborn` share the same intellectual ancestor --- Leland Wilkinson's *Grammar of Graphics*.
+:::
 
-## First Plot: Histogram of Glucose
 
-A histogram is a strong first choice for a continuous variable.
+## Your First Plot: Histogram
+
+A histogram shows the **distribution** of a single continuous variable. Let's start with the simplest possible version and build up.
+
+### A basic histogram
 
 ```{r}
 ggplot(diabetes, aes(x = glucose_mg_dl)) +
-  geom_histogram(binwidth = 10, fill = "#2C7FB8", color = "white", alpha = 0.9) +
-  geom_vline(xintercept = 140, linetype = "dashed", linewidth = 1, color = "#D95F02") +
-  annotate("text", x = 142, y = 85, label = "140 mg/dL", hjust = 0, color = "#D95F02") +
+  geom_histogram()
+```
+
+That's it --- three lines. R picked a default bin width and drew the bars. But we can do much better.
+
+### Adjusting bin width
+
+The default bin count (30) may not suit your data. Use `binwidth` to control the width of each bar:
+
+```{r}
+ggplot(diabetes, aes(x = glucose_mg_dl)) +
+  geom_histogram(binwidth = 10)
+```
+
+Each bar now spans 10 mg/dL. Experiment with different values --- smaller bins show more detail, larger bins show the overall shape.
+
+### Adding color and labels
+
+::: {.callout-note}
+## `fill` vs `color` in ggplot2
+
+These two aesthetics are easy to confuse:
+
+- **`fill`** = the **interior** color of shapes (bars, boxes, areas)
+- **`color`** = the **outline** (border) of shapes, or the color of points and lines
+
+For a histogram, `fill` colors the bars and `color` draws their borders.
+:::
+
+```{r}
+ggplot(diabetes, aes(x = glucose_mg_dl)) +
+  geom_histogram(binwidth = 10, fill = "steelblue", color = "white") +
   labs(
     title = "Distribution of Plasma Glucose",
-    subtitle = "Diabetes dataset (Pima)",
     x = "Glucose (mg/dL)",
     y = "Number of patients"
   ) +
-  theme_minimal(base_size = 12)
+  theme_minimal()
 ```
 
-### New syntax in this plot
+We added three new elements:
 
-- **`geom_histogram(binwidth = 10)`**: create histogram bars with width 10 units.
-- **`geom_vline(xintercept = 140)`**: draw vertical reference line at x = 140.
-- **`annotate("text", ...)`**: place custom text on plot.
-- **`labs(...)`**: set title, subtitle, axis labels.
-- **`theme_minimal()`**: apply a clean visual theme.
+- **`fill = "steelblue"`** --- bar interior color (set outside `aes()` because it's a fixed value, not mapped to a variable)
+- **`labs(...)`** --- title and axis labels
+- **`theme_minimal()`** --- a clean, uncluttered theme
 
-Interpretation: this plot shows distribution shape and spread. The dashed 140 mg/dL line is a useful clinical reference.
+### Adding a clinical reference line
 
-
-## Group Comparison: Boxplot + Jitter
-
-When comparing a continuous variable across groups, boxplots are often the best starting point.
+Clinical thresholds are often worth marking on a plot. `geom_vline()` draws a vertical line:
 
 ```{r}
-diabetes_box <- diabetes |>
-  drop_na(glucose_mg_dl, diabetes_5y)
+ggplot(diabetes, aes(x = glucose_mg_dl)) +
+  geom_histogram(binwidth = 10, fill = "steelblue", color = "white") +
+  geom_vline(xintercept = 140, linetype = "dashed", color = "firebrick") +
+  labs(
+    title = "Distribution of Plasma Glucose",
+    subtitle = "Dashed line at 140 mg/dL (diabetes screening threshold)",
+    x = "Glucose (mg/dL)",
+    y = "Number of patients"
+  ) +
+  theme_minimal()
+```
 
-ggplot(diabetes_box, aes(x = diabetes_5y, y = glucose_mg_dl, fill = diabetes_5y)) +
-  geom_boxplot(alpha = 0.75, outlier.shape = NA) +
-  geom_jitter(width = 0.15, alpha = 0.25, size = 1, color = "#333333") +
-  scale_fill_manual(values = c("neg" = "#4DAF4A", "pos" = "#E41A1C")) +
+::: {.callout-tip}
+## Reference lines for clinical thresholds
+
+`geom_vline(xintercept = ...)` for vertical lines and `geom_hline(yintercept = ...)` for horizontal lines are great for marking clinical cutoffs --- fasting glucose thresholds, BMI boundaries, blood pressure targets, etc.
+:::
+
+### Interpretation
+
+The glucose distribution is right-skewed: most patients cluster between 80--140 mg/dL, with a long tail extending toward higher values. The dashed line at 140 mg/dL shows where the clinical threshold falls.
+
+
+## Comparing Groups: Boxplot {#sec-boxplot}
+
+When comparing a continuous variable across groups, boxplots are often the best starting point. They show the **median**, **quartiles**, and **spread** in one compact display.
+
+### A basic boxplot
+
+```{r}
+ggplot(diabetes, aes(x = diabetes_5y, y = glucose_mg_dl)) +
+  geom_boxplot()
+```
+
+Already useful --- we can see the `pos` group has a higher median glucose.
+
+### Adding color by group
+
+Map `fill` to the grouping variable inside `aes()` to color each group:
+
+```{r}
+ggplot(diabetes, aes(x = diabetes_5y, y = glucose_mg_dl, fill = diabetes_5y)) +
+  geom_boxplot() +
   labs(
     title = "Glucose by 5-Year Diabetes Outcome",
     x = "Outcome at 5 years",
     y = "Glucose (mg/dL)",
     fill = "Outcome"
   ) +
-  theme_minimal(base_size = 12)
+  theme_minimal()
 ```
 
-### New syntax in this plot
+::: {.callout-note}
+## `fill` inside vs outside `aes()`
 
-- **`drop_na(col1, col2)`**: keep only rows where selected columns are not missing.
-- **`geom_boxplot()`**: show median, quartiles, and spread.
-- **`geom_jitter(width = ...)`**: add points with slight horizontal noise to reduce overlap.
-- **`scale_fill_manual(...)`**: choose custom colors for groups.
+- **Inside `aes(fill = diabetes_5y)`** --- color is **mapped to a variable**. Each group gets its own color automatically.
+- **Outside `aes()`, e.g., `fill = "steelblue"`** --- a **fixed color** applied to everything.
 
-Interpretation: the `pos` group tends to have higher glucose values than the `neg` group.
+This inside/outside distinction applies to all aesthetics: `fill`, `color`, `size`, `alpha`, etc.
+:::
 
+### Overlaying individual points with `geom_jitter()`
 
-## Relationship Plot: Scatter + Trend Line
-
-Use a scatter plot to examine two numeric variables together.
+Boxplots summarize, but they hide individual data points. Adding `geom_jitter()` shows every patient:
 
 ```{r}
-diabetes_scatter <- diabetes |>
-  drop_na(bmi, glucose_mg_dl, diabetes_5y)
-
-ggplot(diabetes_scatter, aes(x = bmi, y = glucose_mg_dl, color = diabetes_5y)) +
-  geom_point(alpha = 0.65, size = 2) +
-  geom_smooth(method = "lm", se = TRUE, linewidth = 1) +
-  scale_color_manual(values = c("neg" = "#1B9E77", "pos" = "#D95F02")) +
+ggplot(diabetes, aes(x = diabetes_5y, y = glucose_mg_dl, fill = diabetes_5y)) +
+  geom_boxplot(outlier.shape = NA) +
+  geom_jitter(width = 0.15, alpha = 0.25, size = 1) +
   labs(
-    title = "Relationship Between BMI and Glucose",
-    subtitle = "Colored by 5-year diabetes outcome",
+    title = "Glucose by 5-Year Diabetes Outcome",
+    x = "Outcome at 5 years",
+    y = "Glucose (mg/dL)",
+    fill = "Outcome"
+  ) +
+  theme_minimal()
+```
+
+- **`geom_jitter(width = 0.15)`** --- adds points with slight horizontal randomness to reduce overlap
+- **`alpha = 0.25`** --- makes points semi-transparent so dense areas are visible
+- **`outlier.shape = NA`** --- hides the boxplot's built-in outlier dots (since jitter already shows all points)
+
+### Handling missing values with `drop_na()` {#sec-drop-na}
+
+Real data has missing values. When ggplot2 encounters `NA`s, it usually drops them with a warning message. You can handle this explicitly with `drop_na()`:
+
+```{r}
+#| eval: false
+# Drop rows where insulin is missing before plotting
+diabetes |>
+  drop_na(insulin_microiu_ml) |>
+  ggplot(aes(x = diabetes_5y, y = insulin_microiu_ml)) +
+  geom_boxplot()
+```
+
+`drop_na(column1, column2)` removes rows where **any** of the specified columns are `NA`. If you call `drop_na()` without arguments, it removes rows with `NA` in **any** column.
+
+::: {.callout-warning}
+## `drop_na()` removes entire rows
+
+When you drop rows with missing values, you're removing those patients from the analysis entirely. This is fine for plotting, but be mindful of how much data you're losing --- especially if missingness is substantial (e.g., insulin has ~49% missing in this dataset).
+:::
+
+### Interpretation
+
+The `pos` group clearly shows higher glucose values than the `neg` group, with the median shifted upward. The jitter points reveal that both groups have a wide spread, with considerable overlap.
+
+
+## Exploring Relationships: Scatter Plot
+
+When you want to see how **two continuous variables** relate, a scatter plot is the tool.
+
+### A basic scatter plot
+
+```{r}
+ggplot(diabetes, aes(x = bmi, y = glucose_mg_dl)) +
+  geom_point()
+```
+
+Each dot is one patient. We can already see a general upward trend.
+
+### Adding color for a third variable
+
+Add `color = diabetes_5y` inside `aes()` to show a third variable:
+
+```{r}
+ggplot(diabetes, aes(x = bmi, y = glucose_mg_dl, color = diabetes_5y)) +
+  geom_point(alpha = 0.6) +
+  labs(
+    title = "BMI vs Glucose",
     x = "Body mass index (kg/m²)",
     y = "Glucose (mg/dL)",
     color = "Outcome"
   ) +
-  theme_minimal(base_size = 12)
+  theme_minimal()
 ```
 
-### New syntax in this plot
+::: {.callout-note}
+## `fill` vs `color` --- when to use which
 
-- **`geom_point()`**: draw one point per observation.
-- **`geom_smooth(method = "lm", se = TRUE)`**: add a **linear** trend line with confidence band.
-- **`se = TRUE`**: show the confidence band around the fitted line.
-- **`scale_color_manual(...)`**: set manual colors for `color` aesthetic.
+- Use **`color`** for **points** and **lines** (things without an interior)
+- Use **`fill`** for **bars**, **boxes**, and **areas** (things with an interior)
 
-Notable option to explore:
+Some geoms use both: `geom_boxplot()` uses `fill` for the box interior and `color` for the border.
+:::
 
-- If you write `geom_smooth()` **without** `method = "lm"`, ggplot2 will use its default smoothing method (typically a non-linear smoother for smaller datasets). This is useful for exploratory visualization when relationships may not be linear.
+### Adding a trend line
 
-Interpretation: the trend appears positive (higher BMI associated with higher glucose), but this is descriptive, not causal.
+`geom_smooth()` adds a fitted trend line. By default, it uses a flexible smoother. Add `method = "lm"` for a straight line:
+
+```{r}
+ggplot(diabetes, aes(x = bmi, y = glucose_mg_dl, color = diabetes_5y)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm") +
+  labs(
+    title = "BMI vs Glucose with Trend Lines",
+    x = "Body mass index (kg/m²)",
+    y = "Glucose (mg/dL)",
+    color = "Outcome"
+  ) +
+  theme_minimal()
+```
+
+::: {.callout-note}
+## What does `method = "lm"` mean?
+
+`"lm"` stands for **linear model** --- it draws a straight-line best fit. The shaded band around the line is a **confidence interval**, showing the uncertainty in the trend. We'll learn about linear models formally in a later chapter; for now, just think of it as "draw the best straight line through these points."
+
+If you omit `method = "lm"`, ggplot2 uses a flexible curve (called LOESS) that follows the data more closely.
+:::
+
+### Interpretation
+
+Both groups show a slight positive trend: higher BMI tends to associate with higher glucose. The `pos` group's line sits higher overall. Remember, this is descriptive --- we're not claiming BMI *causes* higher glucose.
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python's seaborn provides similar scatter + trend line functionality:
+
+```python
+import seaborn as sns
+
+sns.lmplot(
+    data=diabetes,
+    x="bmi", y="glucose_mg_dl",
+    hue="diabetes_5y",
+    height=5,
+    scatter_kws={"alpha": 0.5}
+)
+```
+
+`lmplot()` combines scatter points and linear regression lines, similar to `geom_point()` + `geom_smooth(method = "lm")`.
+:::
 
 
-## Categorical Comparison: Bar Chart
+## Categorical Comparisons: Bar Chart
 
-Now we compare counts across category combinations.
+For comparing **counts** across categories, bar charts are the standard.
+
+### Preparing counts with `count()`
+
+First, compute the counts (using `count()` from @sec-summarise):
 
 ```{r}
 bmi_counts <- diabetes |>
   count(diabetes_5y, bmi_class)
+bmi_counts
+```
 
+### `geom_col()` for pre-computed values
+
+Since we already have the `n` column, we use `geom_col()` (not `geom_bar()`):
+
+```{r}
 ggplot(bmi_counts, aes(x = bmi_class, y = n, fill = diabetes_5y)) +
   geom_col(position = "dodge") +
   labs(
-    title = "BMI Class Distribution by 5-Year Diabetes Outcome",
+    title = "BMI Class by Diabetes Outcome",
     x = "BMI class",
     y = "Number of patients",
     fill = "Outcome"
   ) +
-  theme_minimal(base_size = 12) +
-  theme(axis.text.x = element_text(angle = 20, hjust = 1))
+  theme_minimal()
 ```
 
-### New syntax in this plot
+::: {.callout-note}
+## `geom_col()` vs `geom_bar()`
 
-- **`count(var1, var2)`**: quick grouped counts.
-- **`geom_col()`**: bar chart using precomputed y values.
-- **`position = "dodge"`**: place bars side-by-side for comparison.
+- **`geom_col()`** --- you provide both `x` and `y`. The bar heights come from your data (pre-computed counts).
+- **`geom_bar()`** --- you provide only `x`. ggplot2 counts the rows for you automatically.
 
-Notable options to explore:
+When you've already computed counts with `count()` or `summarise()`, use `geom_col()`.
+:::
 
-- **`position = "stack"`** (default): stack groups in one bar.
-- **`position = "fill"`**: show proportions (each bar scaled to 100%).
-- **`position = "identity"`**: draw bars on top of each other (usually with transparency).
+### Side-by-side bars with `position = "dodge"`
 
-This plot communicates subgroup composition more clearly than a printed table.
+The `position` argument controls how grouped bars are arranged:
 
+::: {.callout-tip}
+## Three bar position options
 
-## Faceting: One Figure, Multiple Panels
-
-Faceting splits one plotting template into several panels by subgroup.
+| Position | Effect | Best for |
+|---|---|---|
+| `"dodge"` | Side-by-side | Comparing absolute counts |
+| `"stack"` (default) | Stacked on top | Showing totals with group composition |
+| `"fill"` | Stacked to 100% | Comparing proportions |
+:::
 
 ```{r}
-diabetes_facet <- diabetes |>
-  drop_na(glucose_mg_dl, diabetes_5y)
-
-ggplot(diabetes_facet, aes(x = glucose_mg_dl)) +
-  geom_histogram(binwidth = 10, fill = "#3B528B", color = "white") +
-  facet_wrap(~ diabetes_5y, nrow = 1) +
+# Proportional view — each bar reaches 100%
+ggplot(bmi_counts, aes(x = bmi_class, y = n, fill = diabetes_5y)) +
+  geom_col(position = "fill") +
   labs(
-    title = "Glucose Distribution Stratified by Outcome",
+    title = "Proportion of Diabetes Outcome by BMI Class",
+    x = "BMI class",
+    y = "Proportion",
+    fill = "Outcome"
+  ) +
+  theme_minimal()
+```
+
+### Interpretation
+
+The Obesity category dominates both groups, but the proportion of `pos` outcomes increases with higher BMI class.
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python's seaborn provides `countplot()` for similar bar charts:
+
+```python
+import seaborn as sns
+
+sns.countplot(data=diabetes, x="bmi_class", hue="diabetes_5y")
+```
+
+For pre-computed values, use `sns.barplot()` or `matplotlib`'s `bar()`.
+:::
+
+
+## Splitting into Panels: Faceting
+
+Sometimes overlaying groups on one plot gets crowded. **Faceting** splits the plot into separate panels --- one per group.
+
+### `facet_wrap()` --- one variable
+
+```{r}
+ggplot(diabetes, aes(x = glucose_mg_dl)) +
+  geom_histogram(binwidth = 10, fill = "steelblue", color = "white") +
+  facet_wrap(~ diabetes_5y) +
+  labs(
+    title = "Glucose Distribution by Diabetes Outcome",
     x = "Glucose (mg/dL)",
     y = "Number of patients"
   ) +
-  theme_minimal(base_size = 12)
+  theme_minimal()
 ```
 
-### New syntax in this plot
+The syntax `facet_wrap(~ variable)` means "create one panel per level of this variable." The `~` (tilde) is R's formula notation --- here it simply means "split by."
 
-- **`facet_wrap(~ group_var)`**: create separate panels by a grouping variable.
+::: {.callout-tip}
+## When to facet vs when to color
 
-Faceting reduces clutter and makes within-group patterns easier to inspect.
+- **Facet** when groups have very different distributions or when overlap makes the plot hard to read
+- **Color** when groups overlap but you want them on the same axes for direct comparison
 
-
-## Professional Styling Checklist
-
-Before sharing a figure in slides or reports, verify:
-
-- title is informative,
-- axes include units,
-- legend labels are clear,
-- colors are interpretable and consistent,
-- theme is readable.
-
-Good analysis with unclear visuals is still weak communication.
+Both are valid --- choose whichever communicates more clearly.
+:::
 
 
-## A "Wow" Figure with ggsci (Palmer Penguins)
+## Customizing Your Plots
 
-Near the end of the chapter, we now add a style-focused example. The goal is to demonstrate what a polished, scientific-looking figure can look like.
+### Labels with `labs()`
+
+`labs()` sets all text elements at once:
 
 ```{r}
-penguins_clean <- penguins |>
-  drop_na(bill_length_mm, flipper_length_mm, species)
-
-ggplot(penguins_clean, aes(x = bill_length_mm, y = flipper_length_mm, color = species)) +
-  geom_point(alpha = 0.9, size = 2.4) +
-  geom_smooth(method = "lm", se = FALSE, linewidth = 0.9) +
-  scale_color_lancet() +
-  labs(
-    title = "Palmer Penguins: Bill Length vs Flipper Length",
-    subtitle = "Styled with ggsci Lancet palette for publication-like aesthetics",
-    x = "Bill length (mm)",
-    y = "Flipper length (mm)",
-    color = "Species",
-    caption = "Data: palmerpenguins"
-  ) +
-  theme_minimal(base_size = 13) +
-  theme(
-    plot.title = element_text(face = "bold", size = 15),
-    plot.subtitle = element_text(size = 11, color = "#555555"),
-    panel.grid.minor = element_blank(),
-    legend.position = "top"
-  )
+#| eval: false
+labs(
+  title    = "Main title",
+  subtitle = "Additional context",
+  x        = "X-axis label",
+  y        = "Y-axis label",
+  fill     = "Legend title (for fill)",
+  color    = "Legend title (for color)",
+  caption  = "Source or note"
+)
 ```
 
-### New syntax in this plot
+Always include units in axis labels (e.g., "Glucose (mg/dL)" not just "Glucose").
 
-- **`scale_color_lancet()`** (`ggsci`): apply Lancet-inspired color palette.
-- **`geom_smooth(..., se = FALSE)`**: show the fitted line without confidence band (cleaner presentation style).
-- **`theme(...)`**: fine-tune specific visual elements (title font, grid lines, legend position).
+### Themes: built-in options
 
-This example is intentionally style-forward: fundamentals first, then refinement.
+ggplot2 includes several themes that change the overall look:
+
+| Theme | Style |
+|---|---|
+| `theme_minimal()` | Clean, no box frame |
+| `theme_bw()` | White background with border |
+| `theme_classic()` | Publication-style with axes only |
+| `theme_light()` | Light gray background, fine grid |
+| `theme_void()` | Nothing but the data (useful for maps) |
+
+: Common ggplot2 themes {.striped}
+
+::: {.callout-tip}
+## Choosing a theme
+
+- For presentations: `theme_minimal()` (clean, modern)
+- For publications: `theme_classic()` or `theme_bw()` (formal, traditional)
+- For dashboards: `theme_light()` (readable on screens)
+
+Pick one and use it consistently throughout a report.
+:::
+
+### Manual colors
+
+Control colors explicitly with `scale_fill_manual()` or `scale_color_manual()`:
+
+```{r}
+#| eval: false
+# For fill aesthetic (bars, boxes)
+scale_fill_manual(values = c("neg" = "forestgreen", "pos" = "firebrick"))
+
+# For color aesthetic (points, lines)
+scale_color_manual(values = c("neg" = "forestgreen", "pos" = "firebrick"))
+```
+
+::: {.callout-note}
+## `scale_fill_manual()` vs `scale_color_manual()`
+
+Use `scale_fill_manual()` when your aesthetic is `fill` (bars, boxes). Use `scale_color_manual()` when your aesthetic is `color` (points, lines). They work identically, just for different aesthetics.
+:::
+
+### Journal-style palettes with `ggsci` (optional)
+
+The `ggsci` package provides color palettes inspired by scientific journals:
+
+```{r}
+library(ggsci)
+
+ggplot(diabetes, aes(x = bmi, y = glucose_mg_dl, color = diabetes_5y)) +
+  geom_point(alpha = 0.5) +
+  geom_smooth(method = "lm") +
+  scale_color_lancet() +
+  labs(
+    title = "BMI vs Glucose (Lancet palette)",
+    x = "Body mass index (kg/m²)",
+    y = "Glucose (mg/dL)",
+    color = "Outcome"
+  ) +
+  theme_minimal()
+```
+
+`scale_color_lancet()` applies colors inspired by The Lancet journal. Other options include `scale_color_nejm()` (NEJM), `scale_color_npg()` (Nature), and `scale_color_jama()` (JAMA).
+
+::: {.callout-tip}
+## When to use `ggsci`
+
+`ggsci` palettes are designed for a small number of groups (2--8). They're a quick way to get publication-quality colors without choosing hex codes manually.
+:::
 
 
-## End-to-End Mini Workflow
+## Putting It All Together
 
-Now combine transform + summarize + visualize in one pipeline:
+Let's combine data transformation and visualization in one pipeline --- the real-world pattern:
 
 ```{r}
 diabetes |>
-  filter(glucose_mg_dl > 0, bmi > 0) |>
-  mutate(glucose_group = if_else(glucose_mg_dl >= 140, "High", "Not High")) |>
-  group_by(diabetes_5y, glucose_group) |>
-  summarise(n = n(), .groups = "drop") |>
-  ggplot(aes(x = diabetes_5y, y = n, fill = glucose_group)) +
-  geom_col(position = "dodge") +
+  filter(bmi > 0) |>
+  mutate(bmi_group = if_else(bmi >= 30, "Obese", "Non-obese")) |>
+  ggplot(aes(x = glucose_mg_dl, fill = bmi_group)) +
+  geom_histogram(binwidth = 10, color = "white", alpha = 0.7, position = "identity") +
   labs(
-    title = "Count of High vs Non-High Glucose by 5-Year Outcome",
-    x = "Outcome at 5 years",
+    title = "Glucose Distribution by Obesity Status",
+    x = "Glucose (mg/dL)",
     y = "Number of patients",
-    fill = "Glucose group"
+    fill = "BMI group"
   ) +
-  theme_minimal(base_size = 12)
+  theme_minimal()
 ```
 
-This pattern is practical for real reporting:
+Notice the seamless transition from `|>` (data manipulation) to `+` (ggplot2 layers). The data flows through `filter()` and `mutate()`, then into `ggplot()`.
 
-**filter/transform -> summarise -> visualize**
+::: {.callout-tip}
+## The transform-then-plot pattern
+
+In practice, you'll often pipe data through a few dplyr verbs before handing it to `ggplot()`. This keeps your plotting code focused on *visualization* while the dplyr steps handle *data preparation*.
+:::
+
+
+## Common Errors and Troubleshooting
+
+| Error or Symptom | Cause | Fix |
+|---|---|---|
+| Empty plot (gray box, no data) | Forgot `geom_*()` layer | Add `+ geom_histogram()` or similar |
+| `object 'colname' not found` | Column name typo in `aes()` | Check `names(data)` |
+| `stat_bin() requires a continuous x` | Used a factor/character on x of histogram | Check `class(column)`, convert if needed |
+| `\|>` used instead of `+` | Mixed pipe and ggplot operators | Use `+` between ggplot layers |
+| Legend shows unexpected groups | NA values in grouping variable | Use `drop_na()` before plotting |
+| Bars overlap instead of side-by-side | Missing `position = "dodge"` | Add `position = "dodge"` to `geom_col()` |
+
+: Common ggplot2 errors and their fixes {.striped}
 
 
 ## Summary
 
-| Step | What we learned | Why it matters |
-|---|---|---|
-| 1 | ggplot mental model | Reduces syntax confusion |
-| 2 | Histogram and boxplot | Understand distributions and group differences |
-| 3 | Scatter + trend line | Explore variable relationships |
-| 4 | Bar chart and faceting | Compare categories and subgroups clearly |
-| 5 | Styling with ggsci | Improve professional presentation quality |
+Here's the visualization journey we took with the diabetes data:
 
-In the next chapter, we will move from visual summaries to formal **descriptive statistics**.
+| Step | What we visualized | ggplot2 tool |
+|---|---|---|
+| Distribution | Glucose histogram | `geom_histogram()` |
+| Reference | Clinical threshold line | `geom_vline()` |
+| Group comparison | Glucose by outcome (boxplot) | `geom_boxplot()`, `geom_jitter()` |
+| Relationship | BMI vs glucose (scatter) | `geom_point()`, `geom_smooth()` |
+| Categories | BMI class by outcome (bars) | `geom_col()`, `position` |
+| Panels | Glucose faceted by outcome | `facet_wrap()` |
+| Style | Labels, themes, palettes | `labs()`, `theme_*()`, `ggsci` |
+
+: Chapter 5 journey --- from raw data to polished plots {.striped}
+
+In the next chapter, we'll move from visual summaries to formal **descriptive statistics** --- computing and presenting the numbers behind what we've been seeing in these plots.
 
 
 ## Exercises {.unnumbered}
 
-1. **Histogram practice.** Create a histogram of `glucose_mg_dl` with bin width 5 and add a vertical line at 140 mg/dL.
+1. **Histogram with threshold.** Create a histogram of `dbp_mm_hg` (diastolic blood pressure) with bin width 5. Add a vertical dashed line at 80 mmHg (the threshold for elevated blood pressure). Include a title and axis labels.
 
-2. **Boxplot interpretation.** Create a boxplot of `bmi` by `diabetes_5y` with jitter points. Write 2–3 sentences describing what you observe.
+2. **Group comparison.** Create a boxplot of `bmi` by `diabetes_5y`, with jitter points overlaid. Write 2--3 sentences interpreting what you observe about the two groups.
 
-3. **Scatter with trend.** Plot `age` vs `glucose_mg_dl`, color by `diabetes_5y`, and add a linear trend line.
+3. **Scatter with trend.** Plot `age` (x-axis) vs `glucose_mg_dl` (y-axis), colored by `diabetes_5y`. Add linear trend lines. Does the relationship between age and glucose appear different for the two outcome groups?
 
-4. **Professional styling challenge.** Recreate one diabetes plot using a `ggsci` palette (e.g., Lancet or NPG), with polished title, labels, and caption for a conference slide.
-
-Solutions will be provided in Appendix C.
+4. **Faceted bar chart.** Compute counts of `bmi_class` by `diabetes_5y`, then create a dodged bar chart. Now recreate it using `position = "fill"` to show proportions. Which version better highlights the relationship between BMI class and diabetes outcome?

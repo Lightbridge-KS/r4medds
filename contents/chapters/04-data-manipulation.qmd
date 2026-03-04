@@ -1,288 +1,402 @@
-# Data Manipulation
+# Data Frames and Data Manipulation
 
-In the last chapter, we learned the grammar of R: variables, vectors, functions, and pipes. In this chapter, we switch from *language basics* to *real-world data work* --- the kind of workflow you will use in clinical research and quality improvement projects.
+In the previous chapter, we learned R's grammar --- variables, vectors, functions, and pipes. Now we move from *language basics* to *real data work*: the kind of workflow you'll use daily in clinical research and quality improvement projects.
 
-Our focus is simple: take a real diabetes dataset, import it, inspect it, clean it, and summarize it with `dplyr`.
-
-```{r}
-#| message: false
-#| warning: false
-library(tidyverse)
-library(readxl)
-```
+By the end of this chapter, you'll be able to import a CSV file, inspect it, clean it, transform it, and summarize it --- all with readable, reproducible code.
 
 ::: {.callout-note}
-## Our running example: from file to analysis-ready diabetes registry
+## Our running example: Preparing a diabetes registry
 
-Imagine you are preparing a diabetes registry for a quick departmental analysis.
+Imagine a colleague sends you a file from a diabetes screening program: `diabetes.csv` with 768 patient records. Your job is to turn this raw file into a clean, analysis-ready table.
 
-You receive two files from a colleague:
-
-- `data/diabetes.csv`
-- `data/diabetes.xlsx`
-
-Your job is to turn those files into a clean table you can trust for summaries and visualization.
+Along the way, you'll learn how to inspect, import, clean, transform, and summarize tabular data --- the essential skills for any data analysis project.
 :::
 
 
-## What is a Data Frame?
+## What Is a Data Frame?
 
-A **vector** stores one variable.
-A **data frame** stores multiple variables as columns, with one patient (or one observation) per row.
-A **tibble** is the modern tidyverse version of a data frame.
+In @sec-vectors, you learned that a **vector** holds a single variable --- one column of data. A **data frame** is a collection of vectors arranged side-by-side, forming a table with rows and columns. Each column is a variable, each row is an observation (e.g., one patient).
 
-| Structure | Best for | Example |
+| Structure | What it holds | Example |
 |---|---|---|
 | Vector | One variable | `c(55, 62, 47)` |
-| Data frame | Multiple variables | `data.frame(age, sex, glucose)` |
-| Tibble | Modern tabular workflow | `tibble(age, sex, glucose)` |
+| Data frame | Multiple variables (a table) | A table with `age`, `sex`, `glucose` columns |
 
-### Dataframe Creation
+### Creating a data frame by hand
 
-You can use either `data.frame()` (base R) or modern alternative [`tibble()`](https://tibble.tidyverse.org/index.html). 
+You can create a data frame with `data.frame()`:
 
 ```{r}
-patients_tbl <- data.frame(
-  patient_id = c("P001", "P002", "P003"),
-  age = c(55, 62, 47),
-  sex = c("Female", "Male", "Female"),
+patients <- data.frame(
+  patient_id    = c("P001", "P002", "P003"),
+  age           = c(55, 62, 47),
+  sex           = c("Female", "Male", "Female"),
   glucose_mg_dl = c(145, 132, 178)
 )
-patients_tbl
+patients
+```
+
+Each argument is a column. Notice that the columns are vectors of the same length --- one value per patient.
+
+### Tibble: the tidyverse data frame
+
+The tidyverse provides `tibble()`, a modern version of `data.frame()`. It prints more neatly and avoids some unexpected behaviors:
+
+```{r}
+library(tidyverse)
 ```
 
 ```{r}
-patients_tbl <- tibble(
-  patient_id = c("P001", "P002", "P003"),
-  age = c(55, 62, 47),
-  sex = c("Female", "Male", "Female"),
+patients <- tibble(
+  patient_id    = c("P001", "P002", "P003"),
+  age           = c(55, 62, 47),
+  sex           = c("Female", "Male", "Female"),
   glucose_mg_dl = c(145, 132, 178)
 )
-patients_tbl
+patients
 ```
 
-A quick structural check:
+A tibble shows its dimensions (`3 × 4`) and column types (`<chr>`, `<dbl>`) at the top --- very handy for quick orientation.
+
+::: {.callout-tip}
+## The 60-second data orientation
+
+When you encounter any new table, ask three questions:
+
+1. **What kind of object is this?** → `class(data)`
+2. **How big is it?** → `dim(data)` (rows × columns)
+3. **What are the variable names?** → `names(data)`
 
 ```{r}
-class(patients_tbl)
-dim(patients_tbl)
-names(patients_tbl)
+class(patients)
+dim(patients)
+names(patients)
 ```
 
-When working with any new table, ask three quick questions:
+This quick routine catches most early problems before they become hard-to-trace bugs downstream.
+:::
 
-1. What kind of object is this?
-2. How many rows and columns does it have?
-3. What are the variable names?
+### Exploring structure with `glimpse()`
+
+For a richer overview, `glimpse()` shows every column's name, type, and a few sample values --- all in one compact display:
+
+```{r}
+glimpse(patients)
+```
+
+You'll use `glimpse()` constantly. It's one of the most useful functions in the tidyverse.
 
 
-## First Contact with a Real Medical Dataset (`scurvy`)
+## Warm-Up: Exploring a Packaged Dataset {#sec-warmup-scurvy}
 
-Before touching the diabetes files, let’s inspect one packaged medical dataset to practice orientation.
+Before touching our diabetes file, let's practice with a small dataset that comes pre-loaded in an R package. The `scurvy` dataset from the `medicaldata` package records a historic clinical trial on scurvy treatments (12 patients, 8 variables).
 
 ```{r}
 data("scurvy", package = "medicaldata")
-scurvy |> head()
 ```
+
+Apply the 60-second orientation:
 
 ```{r}
 class(scurvy)
 dim(scurvy)
 names(scurvy)
+```
+
+```{r}
 glimpse(scurvy)
 ```
 
-`glimpse()` is especially useful because it shows variable names, types, and sample values in one compact view.
-
-
-## Core Tidyverse Manipulation Pattern
-
-Most table manipulation in this book follows one pattern:
-
-```r
-dataset |> verb(arguments)
-```
-
-- **`dataset`** --- the table you start with
-- **`|>`** --- send output from left to right
-- **`verb(...)`** --- one clear operation (`select`, `filter`, `mutate`, `summarise`, etc.)
-
-Example:
-
-```{r}
-scurvy |>
-  select(study_id, treatment)
-```
-
-::: {.callout-tip}
-## One verb at a time
-When learning, write one verb per line. Once each step is clear, combine them into a pipeline.
-:::
-
-
-## Importing Files: CSV and Excel
-
-In real projects, data usually arrives as files. Let’s import both versions of the diabetes dataset.
-
-### A) Import CSV with `read_csv()`
-
-```{r}
-diabetes_csv <- read_csv("../../data/diabetes.csv", show_col_types = FALSE)
-```
-
-```{r}
-names(diabetes_csv)
-nrow(diabetes_csv)
-```
-
-```{r}
-str(diabetes_csv)
-```
-
-```{r}
-glimpse(diabetes_csv)
-```
-
-```{r}
-summary(diabetes_csv)
-```
-
-### B) Import Excel with `read_excel()`
-
-```{r}
-diabetes_xlsx <- read_excel("../../data/diabetes.xlsx")
-```
-
-```{r}
-glimpse(diabetes_xlsx)
-```
-
-By default in this chapter, we will continue with `diabetes_csv` as our main working table:
-
-```{r}
-diabetes_raw <- diabetes_csv
-```
-
-You can also read a specific Excel sheet or range:
-
-```{r}
-#| eval: false
-read_excel("../../data/diabetes.xlsx", sheet = 1)
-read_excel("../../data/diabetes.xlsx", range = "A1:D20")
-```
-
-::: {.callout-warning}
-## Common import pitfalls
-- **Wrong path** → file not found
-- **Unexpected missing values** (`"NA"`, blanks, custom codes)
-- **Wrong variable type** (e.g., numbers imported as text)
-
-After import, check column names and types (`str()`, `glimpse()`), then run a quick summary (`summary()`) before analysis.
-:::
-
-::: {.callout-note}
-## 60-second import checklist
-
-Right after reading a new file, run these first:
-
-1. `names(data)`
-2. `nrow(data)` and `ncol(data)`
-3. `glimpse(data)`
-4. `summary(data)`
-
-This quick routine catches most early data problems.
-:::
+Notice the column types: `<chr>` for character, `<fct>` for factor. We'll explain factors next --- they're important for clinical data.
 
 ::: {.callout-caution collapse="true" title="Python Comparison"}
-In Python/pandas, the equivalent is:
+Python's equivalent of a data frame is the pandas `DataFrame`:
 
 ```python
 import pandas as pd
 
-diabetes_raw = pd.read_csv("data/diabetes.csv")
-diabetes_raw = pd.read_excel("data/diabetes.xlsx")
+# Create a DataFrame
+patients = pd.DataFrame({
+    "patient_id": ["P001", "P002", "P003"],
+    "age": [55, 62, 47],
+    "sex": ["Female", "Male", "Female"],
+    "glucose_mg_dl": [145, 132, 178]
+})
+
+# Orientation
+patients.shape    # (3, 4) — like dim()
+patients.columns  # column names — like names()
+patients.dtypes   # column types — like glimpse()
+patients.info()   # combined overview
 ```
 :::
 
 
-## Prepare Column Names for Comfortable Coding
+## Factors in Practice {#sec-factors-practice}
 
-The raw dataset uses names like `glucose_mg-dl` and `dbp_mm-hg`. These are meaningful, but the hyphen (`-`) is not ideal for data frame column names in R code.
+In @sec-factors, you learned that a **factor** is R's type for categorical data --- a character variable with a fixed set of **levels**. You also learned to create factors with `factor()` and control level order with the `levels` argument.
 
-A common workflow is:
+Now let's learn a tidyverse tool that makes reordering levels more convenient: `fct_relevel()`.
 
-1. Keep source files unchanged (for traceability)
-2. Create a working copy with clean names for analysis
+### Reordering levels with `fct_relevel()`
+
+The `forcats` package (loaded with `library(tidyverse)`) provides `fct_relevel()` to reorder factor levels **after** a factor has been created. This is especially useful when you receive data where the factor order isn't what you need:
 
 ```{r}
-diabetes <- diabetes_raw |> janitor::clean_names()
+# Default: alphabetical order
+outcome <- factor(c("pos", "neg", "pos", "neg"))
+outcome
 ```
 
-::: {.callout-tip appearance="default" collapse="true"}
-### Tips: `janitor` R package
+```{r}
+# Reorder: put "neg" first (as the reference level)
+outcome <- fct_relevel(outcome, "neg", "pos")
+outcome
+```
 
-The `janitor` package provides useful functions for cleaning data in R. `clean_names()` is one of the most helpful. Have a look at <https://sfirke.github.io/janitor/>.
+`fct_relevel()` takes the factor and the levels in your desired order. You'll use this frequently when preparing data for plots and statistical models, because the first level controls:
+
+- **Plot axis/legend order** --- categories appear in level order
+- **Table row order** --- summary tables follow level order
+- **Statistical reference category** --- the first level is the baseline in regression
+
+::: {.callout-tip}
+## `factor()` vs `fct_relevel()` --- when to use which?
+
+- **`factor(x, levels = ...)`** --- when **creating** a factor from scratch (e.g., from a character vector). You learned this in @sec-factors.
+- **`fct_relevel(x, ...)`** --- when **reordering** an existing factor (e.g., a column that's already a factor but in the wrong order).
+
+Both achieve the same result; `fct_relevel()` is simply more convenient for existing factors.
 :::
 
-Column names before and after cleaning:
+
+## Importing Data from Files {#sec-import}
+
+In real projects, data arrives as files --- CSV, Excel, or other formats. Let's import our diabetes dataset.
+
+### Reading CSV with `read_csv()`
+
+The `readr` package (part of the tidyverse) provides `read_csv()` for reading CSV files:
 
 ```{r}
+diabetes_raw <- read_csv("../../data/diabetes.csv", show_col_types = FALSE)
+```
+
+Let's break down the syntax:
+
+- **`read_csv("path/to/file.csv")`** --- reads the file at the given path and returns a tibble
+- **`show_col_types = FALSE`** --- suppresses the column-type message that `read_csv()` prints by default. Useful for keeping output clean.
+
+::: {.callout-note}
+## File paths in a Quarto book
+
+The path `"../../data/diabetes.csv"` means "go up two directories from the chapter file, then into `data/`." In your own R scripts, adjust the path to match where your file lives. Using **RStudio Projects** (as covered in @sec-rstudio-projects) makes paths simpler and more portable.
+:::
+
+### Inspecting after import
+
+Always check your data right after import:
+
+```{r}
+dim(diabetes_raw)
 names(diabetes_raw)
+```
+
+```{r}
+glimpse(diabetes_raw)
+```
+
+We have 768 rows and 9 columns. But notice the column names: `glucose_mg-dl`, `dbp_mm-hg` --- those hyphens will cause problems in R code.
+
+::: {.callout-tip}
+## The post-import checklist
+
+Right after reading any file, run these four checks:
+
+1. `dim(data)` --- expected number of rows and columns?
+2. `names(data)` --- column names sensible?
+3. `glimpse(data)` --- types correct? (numbers as `<dbl>`, text as `<chr>`)
+4. `summary(data)` --- any suspicious min/max values or unexpected `NA`s?
+:::
+
+### Cleaning column names with `clean_names()`
+
+The `janitor` package provides `clean_names()`, which converts column names to consistent `snake_case` --- replacing hyphens, spaces, and dots with underscores:
+
+```{r}
+library(janitor)
+
+diabetes <- diabetes_raw |> clean_names()
 names(diabetes)
 ```
 
-Now we can type cleaner names like `glucose_mg_dl` and `dbp_mm_hg`.
+Now `glucose_mg-dl` has become `glucose_mg_dl` --- much easier to type and less error-prone.
 
+::: {.callout-note}
+## Why clean names matter
 
-## `dplyr` Verbs: The Clinical Thinking Order
+R can handle column names with hyphens (e.g., `` diabetes$`glucose_mg-dl` ``), but you need backticks every time. Clean snake_case names let you write `diabetes$glucose_mg_dl` without any special syntax.
+:::
 
-Before syntax, keep this mental model:
+### Reading Excel files (brief) {#sec-import-excel}
 
-- **Which columns matter?** (`select`, `rename`)
-- **Which rows matter?** (`filter`, `arrange`)
-- **What new variables do I need?** (`mutate`)
-- **What cohort-level summary do I need?** (`group_by`, `summarise`)
+For Excel files, the `readxl` package provides `read_excel()`:
 
-| Category | Verbs | Purpose |
+```{r}
+library(readxl)
+
+diabetes_xlsx <- read_excel("../../data/diabetes.xlsx")
+glimpse(diabetes_xlsx)
+```
+
+You can also specify a sheet or cell range:
+
+```{r}
+#| eval: false
+read_excel("data/file.xlsx", sheet = "Sheet2")
+read_excel("data/file.xlsx", range = "A1:D20")
+```
+
+::: {.callout-warning}
+## Common import pitfalls
+
+| Problem | Symptom | Fix |
 |---|---|---|
-| Column operations | `select()`, `rename()` | Choose and relabel variables |
-| Row operations | `filter()`, `arrange()` | Keep and order patients |
-| Create/transform | `mutate()` | Derive new variables |
-| Aggregate | `group_by()`, `summarise()` | Build cohort summaries |
+| Wrong file path | `Error: 'file.csv' does not exist` | Check `getwd()`, use RStudio file browser |
+| Numbers read as text | Column shows `<chr>` instead of `<dbl>` | Check for text like `"N/A"` in numeric columns |
+| Unexpected NAs | More `NA`s than expected | Source file uses blanks or custom codes (`-`, `999`) |
+| Encoding issues | Garbled characters | Try `read_csv(..., locale = locale(encoding = "UTF-8"))` |
+:::
 
-### 1) Column operations: `select()` and `rename()`
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python's pandas uses similar functions:
 
-Use `select()` when you want to select a **subset** of columns.
+```python
+import pandas as pd
+
+# CSV
+df = pd.read_csv("data/diabetes.csv")
+
+# Excel
+df = pd.read_excel("data/diabetes.xlsx", sheet_name="Sheet1")
+
+# Inspect
+df.shape
+df.columns
+df.info()
+df.describe()
+```
+:::
+
+
+## The dplyr Toolkit: Overview {#sec-dplyr-overview}
+
+Now that our data is imported and cleaned, it's time to **manipulate** it --- selecting columns, filtering rows, creating new variables, and computing summaries.
+
+The `dplyr` package (part of the tidyverse) provides a set of **verbs** --- functions named after what they do. Before diving into each one, here's the big picture:
+
+| Category | Verb | What it does |
+|---|---|---|
+| **Columns** | `select()` | Choose which columns to keep |
+| | `rename()` | Change column names |
+| **Rows** | `filter()` | Keep rows that match a condition |
+| | `arrange()` | Sort rows by a column |
+| **Create** | `mutate()` | Add or modify columns |
+| **Aggregate** | `summarise()` | Collapse many rows into a summary |
+| | `group_by()` | Split data into groups before summarizing |
+| | `count()` | Quick frequency table |
+
+: Core dplyr verbs organized by purpose {.striped}
+
+All dplyr verbs follow the same pattern:
+
+```r
+data |> verb(arguments)
+```
+
+The first argument is always the data (passed via `|>`), and you refer to column names **without quotes**.
+
+
+## Selecting and Renaming Columns
+
+### `select()` --- choose columns
+
+Use `select()` to keep only the columns you need:
 
 ```{r}
 diabetes |>
-  select(glucose_mg_dl, bmi, age, diabetes_5y) |>
+  select(age, bmi, glucose_mg_dl, diabetes_5y) |>
   head()
 ```
 
-Use `rename()` when you want to rename a column to improve readability.
+You can also **exclude** columns with `-`:
 
 ```{r}
 diabetes |>
-  rename(
-    age_years = age,
-    outcome_5y = diabetes_5y
-  ) |>
+  select(-pedigree, -pregnancy_num) |>
   head()
 ```
 
+::: {.callout-tip}
+## Column selection helpers
 
-### 2) Row operations: `filter()` and `arrange()`
+When you have many columns with similar names, these helpers save typing:
 
-Use `filter()` to keep rows where the condition inside `filter(...)` evaluates to `TRUE`.
+- `starts_with("bp")` --- columns starting with "bp"
+- `ends_with("_ml")` --- columns ending with "_ml"
+- `contains("glucose")` --- columns containing "glucose"
 
 ```{r}
+#| eval: false
+diabetes |> select(starts_with("insulin"))
+```
+:::
+
+### `rename()` --- relabel columns
+
+Use `rename()` to give columns clearer names. The syntax is `new_name = old_name`:
+
+```{r}
+diabetes |>
+  rename(outcome_5y = diabetes_5y) |>
+  head(3)
+```
+
+
+## Filtering and Arranging Rows
+
+### `filter()` --- keep rows by condition
+
+`filter()` keeps only the rows where your condition is `TRUE`. This uses the comparison operators you learned in @sec-logical-ops:
+
+```{r}
+# Patients with high glucose (>= 140 mg/dL)
 diabetes |>
   filter(glucose_mg_dl >= 140) |>
   head()
 ```
 
-Use `arrange()` to **sort** rows by a given column:
+### Combining conditions in `filter()`
+
+Use `&` (AND) or `,` (comma, same as AND) to require multiple conditions. Use `|` (OR) for either-or:
+
+```{r}
+# High glucose AND age over 50
+diabetes |>
+  filter(glucose_mg_dl >= 140, age > 50) |>
+  head()
+```
+
+```{r}
+# Very young OR very old patients
+diabetes |>
+  filter(age < 25 | age > 65) |>
+  head()
+```
+
+### `arrange()` --- sort rows
+
+`arrange()` sorts rows by a column in ascending order:
 
 ```{r}
 diabetes |>
@@ -290,7 +404,9 @@ diabetes |>
   head()
 ```
 
-To sort from highest first, use `desc()`:
+### Sorting in descending order with `desc()`
+
+Wrap a column in `desc()` to sort from highest to lowest:
 
 ```{r}
 diabetes |>
@@ -298,187 +414,402 @@ diabetes |>
   head()
 ```
 
+`desc()` simply means "descending." You'll use it whenever you want the largest (or latest) values first.
 
-### 3) Create variables: `mutate()`
+
+## Creating New Variables with `mutate()` {#sec-mutate}
+
+`mutate()` adds new columns (or modifies existing ones) based on calculations or conditions.
+
+### Simple derived columns
+
+```{r}
+diabetes |>
+  mutate(age_months = age * 12) |>
+  select(age, age_months) |>
+  head()
+```
+
+The new column `age_months` is computed from the existing `age` column.
+
+### Two-way classification with `if_else()`
+
+Often you need to create a variable with two categories: "yes or no", "high or normal", etc. The `if_else()` function handles this:
+
+```r
+if_else(condition, true_value, false_value)
+```
+
+Let's break it down:
+
+- **`condition`** --- a logical test applied to each row (e.g., `glucose_mg_dl >= 140`)
+- **`true_value`** --- the value to assign when the condition is `TRUE`
+- **`false_value`** --- the value to assign when the condition is `FALSE`
+
+```{r}
+diabetes |>
+  mutate(glucose_flag = if_else(glucose_mg_dl >= 140, "High", "Normal")) |>
+  select(glucose_mg_dl, glucose_flag) |>
+  head()
+```
+
+::: {.callout-tip}
+## `if_else()` vs `ifelse()`
+
+In @sec-flow-control, you learned base R's `ifelse()`. The dplyr version `if_else()` (with an underscore) is stricter --- it checks that the true and false values are the same type, catching subtle bugs early. Use `if_else()` inside `mutate()`.
+:::
+
+### Multi-way classification with `case_when()` {#sec-case-when}
+
+When you have **more than two categories**, `case_when()` is the tool. Think of it as a vectorized version of `if` / `else if` / `else` from @sec-flow-control:
+
+```r
+case_when(
+  condition1 ~ value1,
+  condition2 ~ value2,
+  condition3 ~ value3,
+  .default = fallback_value
+)
+```
+
+Let's break it down:
+
+- Each line is a **condition `~` value** pair (read `~` as "then")
+- Conditions are checked **in order** --- the first `TRUE` match wins
+- **`.default`** --- the value when no condition matches (like the final `else`)
+
+Here's a clinical example --- classifying BMI:
 
 ```{r}
 diabetes |>
   mutate(
-    high_glucose = glucose_mg_dl >= 140,
     bmi_class = case_when(
       bmi < 18.5 ~ "Underweight",
-      bmi < 25 ~ "Normal",
-      bmi < 30 ~ "Overweight",
-      TRUE ~ "Obesity"
+      bmi < 25   ~ "Normal",
+      bmi < 30   ~ "Overweight",
+      .default   = "Obesity"
     )
   ) |>
-  select(glucose_mg_dl, bmi, high_glucose, bmi_class) |>
-  head()
+  select(bmi, bmi_class) |>
+  head(8)
 ```
 
-`mutate()` is where raw variables become clinically interpretable variables.
+A patient with BMI 24.0 doesn't match `< 18.5`, but does match `< 25`, so they get `"Normal"`. The order matters --- just like `if` / `else if` in @sec-flow-control.
 
-### 4) Aggregate: `group_by()` + `summarise()`
+::: {.callout-warning}
+## The `.default` argument
+
+In older R code and tutorials, you may see `TRUE ~ "Obesity"` instead of `.default = "Obesity"`. Both work, but `.default` is the modern, clearer syntax. We use `.default` throughout this book.
+:::
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+Python's pandas offers `np.where()` for two-way (like `if_else()`) and `pd.cut()` or `np.select()` for multi-way (like `case_when()`):
+
+```python
+import numpy as np
+
+# Two-way (like if_else)
+df["glucose_flag"] = np.where(df["glucose_mg_dl"] >= 140, "High", "Normal")
+
+# Multi-way (like case_when)
+conditions = [
+    df["bmi"] < 18.5,
+    df["bmi"] < 25,
+    df["bmi"] < 30,
+]
+choices = ["Underweight", "Normal", "Overweight"]
+df["bmi_class"] = np.select(conditions, choices, default="Obesity")
+```
+:::
+
+
+## Summarizing Data {#sec-summarise}
+
+### `summarise()` --- collapse to one row
+
+`summarise()` (or `summarize()` --- both spellings work) computes summary statistics, collapsing the entire table into a single row:
+
+```{r}
+diabetes |>
+  summarise(
+    n_patients   = n(),
+    mean_age     = mean(age, na.rm = TRUE),
+    mean_glucose = mean(glucose_mg_dl, na.rm = TRUE)
+  )
+```
+
+Let's break this down:
+
+- **`n()`** --- counts the number of rows (patients)
+- **`mean(column, na.rm = TRUE)`** --- computes the mean, removing any `NA` values (recall `na.rm` from @sec-na)
+- Each `name = expression` pair becomes a column in the output
+
+### `group_by()` + `summarise()` --- summaries by group
+
+Often you want summaries **per group** rather than for everyone. `group_by()` splits the data, and `summarise()` computes within each group:
 
 ```{r}
 diabetes |>
   group_by(diabetes_5y) |>
   summarise(
-    n = n(),
+    n            = n(),
     mean_glucose = mean(glucose_mg_dl, na.rm = TRUE),
-    mean_bmi = mean(bmi, na.rm = TRUE)
+    mean_bmi     = mean(bmi, na.rm = TRUE)
   )
 ```
 
-This gives a quick cohort-level comparison by 5-year diabetes outcome.
-In most runs, you'll see that the `pos` group has higher mean glucose than the `neg` group --- a good sanity check that the summary aligns with clinical expectations.
+The `pos` group has higher mean glucose --- a good sanity check that the data aligns with clinical expectations.
 
-### Build a short pipeline (incremental complexity)
+::: {.callout-note}
+## What about `.groups = "drop"`?
+
+After `group_by() |> summarise()`, the result may retain grouping. Adding `.groups = "drop"` at the end of `summarise()` removes it:
+
+```{r}
+#| eval: false
+diabetes |>
+  group_by(diabetes_5y) |>
+  summarise(n = n(), .groups = "drop")
+```
+
+This is good practice when you plan to pipe the result into further operations. If you see a message about "regrouping," that's R reminding you about this.
+:::
+
+### The `count()` shortcut
+
+`count()` is a quick way to get frequency tables --- it combines `group_by()` + `summarise(n = n())` in one step:
+
+```{r}
+diabetes |> count(diabetes_5y)
+```
+
+You can count combinations of multiple variables:
 
 ```{r}
 diabetes |>
-  filter(age >= 30) |>
-  mutate(high_glucose = glucose_mg_dl >= 140) |>
-  group_by(high_glucose) |>
-  summarise(
-    n = n(),
-    avg_bmi = mean(bmi, na.rm = TRUE)
-  )
+  mutate(age_group = if_else(age >= 50, "50+", "Under 50")) |>
+  count(diabetes_5y, age_group)
 ```
 
-Read it left-to-right:
-
-1. Keep patients age 30+
-2. Create a high-glucose flag
-3. Compare BMI by glucose group
-
 ::: {.callout-caution collapse="true" title="Python Comparison"}
-R pipeline idea in pandas (using cleaned snake_case columns):
+Python's pandas equivalents:
 
 ```python
-(
-    diabetes.query("age >= 30")
-    .assign(high_glucose=lambda df: df["glucose_mg_dl"] >= 140)
-    .groupby("high_glucose", as_index=False)
-    .agg(n=("glucose_mg_dl", "size"), avg_bmi=("bmi", "mean"))
-)
+# summarise → agg
+df.agg(n_patients=("age", "size"), mean_age=("age", "mean"))
+
+# group_by + summarise → groupby + agg
+df.groupby("diabetes_5y").agg(
+    n=("age", "size"),
+    mean_glucose=("glucose_mg_dl", "mean")
+).reset_index()
+
+# count → value_counts
+df["diabetes_5y"].value_counts()
 ```
 :::
 
 
-## Tidy Data: Wide vs Long
+## Building Pipelines {#sec-building-pipelines}
 
-A dataset is **tidy** when:
+You've been using `|>` to chain single operations. Now let's build **multi-step pipelines** --- the real power of the tidyverse workflow.
 
-1. each variable has its own column,
-2. each observation has its own row,
-3. each value has its own cell.
+### Start small: two verbs
 
-Why this matters: tidy format makes plotting and grouped analysis much easier.
+```{r}
+diabetes |>
+  filter(age >= 50) |>
+  select(age, glucose_mg_dl, diabetes_5y)
+```
 
-### Example: blood pressure over multiple days
+Read it as: *"Take diabetes, **then** keep patients 50+, **then** select three columns."*
+
+### Add a step: three verbs
+
+```{r}
+diabetes |>
+  filter(age >= 50) |>
+  mutate(glucose_flag = if_else(glucose_mg_dl >= 140, "High", "Normal")) |>
+  count(glucose_flag)
+```
+
+Each line does one thing. You can read the pipeline top-to-bottom like a recipe.
+
+### Reading a pipeline aloud
+
+A good test: if you can read your pipeline as an English sentence, it's well-written:
+
+> "Take the diabetes data, keep patients aged 50 and older, create a glucose flag (high if >= 140, normal otherwise), then count how many are in each group."
+
+::: {.callout-tip}
+## One verb per line
+
+Write each verb on its own line. This makes pipelines easy to read, debug, and modify:
+
+```{r}
+#| eval: false
+# Good — one verb per line
+diabetes |>
+  filter(age >= 50) |>
+  mutate(glucose_flag = if_else(glucose_mg_dl >= 140, "High", "Normal")) |>
+  count(glucose_flag)
+
+# Hard to read — everything on one line
+diabetes |> filter(age >= 50) |> mutate(glucose_flag = if_else(glucose_mg_dl >= 140, "High", "Normal")) |> count(glucose_flag)
+```
+:::
+
+::: {.callout-warning}
+## Forgetting `|>` between lines
+
+If you forget a pipe, R treats the next line as a separate (incomplete) command:
+
+```{r}
+#| eval: false
+# BUG: missing |> after filter()
+diabetes |>
+  filter(age >= 50)
+  select(age, glucose_mg_dl)   # Error!
+```
+
+If you see an "unexpected" error, check that every line (except the last) ends with `|>`.
+:::
+
+
+## Tidy Data: Wide vs Long {#sec-tidy-data}
+
+Before we move on, there's one more concept you'll encounter often: **tidy data**. A dataset is **tidy** when:
+
+1. Each **variable** has its own column
+2. Each **observation** has its own row
+3. Each **value** has its own cell
+
+Why does this matter? Because tidy data makes plotting and grouped analysis much easier. The tools we've learned (`filter()`, `mutate()`, `ggplot2`) all expect tidy format.
+
+### Example: Blood pressure over multiple days
+
+Consider three patients with blood pressure measured on three days:
 
 ```{r}
 bp_wide <- tibble(
   patient_id = c("P001", "P002", "P003"),
-  bp_day1 = c(142, 130, 150),
-  bp_day2 = c(138, 128, 147),
-  bp_day3 = c(135, 126, 145)
+  bp_day1    = c(142, 130, 150),
+  bp_day2    = c(138, 128, 147),
+  bp_day3    = c(135, 126, 145)
 )
-
 bp_wide
 ```
+
+This is **wide format** --- each day is a separate column. It's readable for humans but awkward for analysis: there's no single "blood pressure" column to plot or summarize.
+
+### `pivot_longer()` --- wide to long
+
+`pivot_longer()` reshapes wide data into tidy (long) format:
 
 ```{r}
 bp_long <- bp_wide |>
   pivot_longer(
-    cols = starts_with("bp_day"),
-    names_to = "day",
+    cols      = starts_with("bp_day"),
+    names_to  = "day",
     values_to = "systolic_bp"
   )
-
 bp_long
 ```
 
+Let's break down the arguments:
+
+- **`cols`** --- which columns to reshape (here, all columns starting with `"bp_day"`)
+- **`names_to`** --- name for the new column that will hold the old column names
+- **`values_to`** --- name for the new column that will hold the values
+
+Now we have a proper "systolic_bp" variable --- one row per measurement. In @sec-ggplot2, this format will make plotting straightforward.
+
+### `pivot_wider()` --- long to wide (brief)
+
+The reverse operation converts long format back to wide:
+
 ```{r}
-# Optional reverse: long -> wide
 bp_long |>
   pivot_wider(
-    names_from = day,
+    names_from  = day,
     values_from = systolic_bp
   )
 ```
 
-In the next visualization chapter, long format will feel much more natural with `ggplot2`.
+You'll use `pivot_wider()` less often, but it's good to know it exists.
+
+::: {.callout-note}
+## Why tidy format matters
+
+Most R tools --- `ggplot2` for plotting, `dplyr` for summaries, statistical functions --- expect tidy data. When your data isn't in the right shape, `pivot_longer()` and `pivot_wider()` are the tools to fix it.
+:::
 
 
-## End-to-End Mini Workflow (Realistic Pattern)
+## Common Errors and Troubleshooting
 
-Now let’s connect everything into one practical chain.
+Here are errors you'll likely encounter when working with data frames and dplyr:
 
-```{r}
-diabetes |>
-  select(glucose_mg_dl, dbp_mm_hg, bmi, age, diabetes_5y) |>
-  filter(
-    glucose_mg_dl > 0,
-    dbp_mm_hg > 0,
-    bmi > 0,
-    age >= 18
-  ) |>
-  mutate(
-    glucose_group = if_else(glucose_mg_dl >= 140, "High", "Not High"),
-    bmi_class = case_when(
-      bmi < 25 ~ "Normal",
-      bmi < 30 ~ "Overweight",
-      TRUE ~ "Obesity"
-    )
-  ) |>
-  group_by(diabetes_5y, glucose_group, bmi_class) |>
-  summarise(
-    n = n(),
-    mean_age = mean(age, na.rm = TRUE),
-    .groups = "drop"
-  )
-```
+| Error Message | What It Means | Fix |
+|---|---|---|
+| `object 'colname' not found` | Column name has a typo | Check `names(data)` for the correct spelling |
+| `could not find function "select"` | `dplyr` not loaded | Add `library(tidyverse)` at the top |
+| `` Error in `filter()`: `` `i` `` must be a logical vector`` | Used `=` instead of `==` in a condition | Use `filter(age == 50)`, not `filter(age = 50)` |
+| `'file.csv' does not exist` | Wrong file path | Check `getwd()`, adjust the path |
+| `Column 'x' doesn't exist` | Wrong column name after `clean_names()` | Run `names(data)` to see cleaned names |
+| `unexpected ')'` | Missing or extra parenthesis | Count your opening and closing parens |
 
-This is a reusable template for many projects:
+: Common data manipulation errors and their fixes {.striped}
 
-**import -> inspect -> clean -> transform -> summarize**
+::: {.callout-tip}
+## The debugging habit (data edition)
+
+When a dplyr pipeline fails:
+
+1. **Run it line by line** --- add one verb at a time and check the output
+2. **Check column names** --- a typo is the most common cause
+3. **Check column types** --- `glimpse(data)` shows whether a column is numeric or character
+:::
 
 
 ## Summary
 
-| Step | What we did | Why it matters |
-|---|---|---|
-| 1 | Built and inspected small tables | Understand tabular structure before analysis |
-| 2 | Imported CSV + Excel diabetes files | Real project entry point |
-| 3 | Cleaned column names for coding comfort | Reduce syntax friction and mistakes |
-| 4 | Applied core `dplyr` verbs | Core manipulation toolkit |
-| 5 | Reshaped wide data to long | Prepare for plotting and grouped analysis |
-| 6 | Built one full pipeline | Reproducible workflow you can reuse |
+Here's the journey we took with the diabetes registry:
 
-In the next chapter, we will use these cleaned tables to create clear, publication-ready visualizations with `ggplot2`.
+| Step | What we did | R tool |
+|---|---|---|
+| Orient | Explored structure of a table | `class()`, `dim()`, `names()`, `glimpse()` |
+| Categorize | Created and ordered factors | `factor()`, `fct_relevel()` |
+| Import | Loaded the CSV file | `read_csv()` |
+| Clean | Standardized column names | `clean_names()` |
+| Select | Chose relevant columns | `select()`, `rename()` |
+| Filter | Kept rows by condition | `filter()`, `arrange()`, `desc()` |
+| Transform | Created BMI class and glucose flag | `mutate()`, `if_else()`, `case_when()` |
+| Summarize | Compared groups | `group_by()`, `summarise()`, `count()` |
+| Reshape | Converted wide to long | `pivot_longer()`, `pivot_wider()` |
+
+: Chapter 4 journey --- from raw file to analysis-ready table {.striped}
+
+These data manipulation skills are the foundation for everything that follows. In the next chapter, we'll use these same tools to prepare data for **visualization with ggplot2** --- turning numbers into insights you can see.
 
 
 ## Exercises {.unnumbered}
 
-1. **Quick import check.** Import `../../data/diabetes.csv`, then report:
-   - number of rows and columns,
-   - variable names,
-   - one variable with missing values.
+1. **Quick import check.** Import `diabetes.csv` using `read_csv()`, clean the column names, then report: the number of rows and columns, the column names, and one variable that contains missing values. *(Hint: `summary()` shows `NA` counts.)*
 
-2. **Focused subset for clinic handout.** Create a table with only `age`, `bmi`, `glucose_mg_dl`, and `diabetes_5y`. Keep only rows with `age >= 40` and sort by descending glucose.
+2. **Focused subset for clinic handout.** Starting from the cleaned diabetes table, select only `age`, `bmi`, `glucose_mg_dl`, and `diabetes_5y`. Keep patients aged 40 and older, and sort by descending glucose. Show the first 10 rows.
 
-3. **Create a risk flag.** Add a new variable `high_risk` defined as:
-   - `TRUE` if `glucose_mg_dl >= 140` and `bmi >= 30`
-   - `FALSE` otherwise
+3. **Blood pressure classification.** Use `mutate()` with `case_when()` to classify `dbp_mm_hg` into:
+   - `"Normal"` (< 80)
+   - `"Elevated"` (80--89)
+   - `"High"` (90 or above)
+   - Use `.default` for any remaining values
 
-   Then count how many patients are `high_risk`.
+   Then use `count()` to see how many patients fall in each category.
 
-4. **Mini cohort summary.** Build a pipeline that groups by `diabetes_5y` and reports:
-   - `n`
-   - mean age
-   - mean BMI
-   - proportion with high glucose (`glucose_mg_dl >= 140`)
+4. **Cohort comparison pipeline.** Build a pipeline that:
+   a. Filters to patients aged 30 and above
+   b. Creates a `glucose_flag` using `if_else()` (High if `glucose_mg_dl >= 140`, Normal otherwise)
+   c. Groups by `diabetes_5y` and `glucose_flag`
+   d. Summarizes the count and mean BMI per group
 
-Solutions will be provided in Appendix C.
+   Read your pipeline aloud --- does it make sense as an English sentence?

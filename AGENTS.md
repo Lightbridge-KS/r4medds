@@ -10,24 +10,30 @@ Quarto book teaching R for healthcare professionals. Standalone self-paced mater
 
 ## Structure
 
-- `contents/chapters/` — Ch 01+ (`.qmd` files, unnumbered early chapters then Parts 1-3)
+- `contents/chapters/` — Ch 01+ (`.qmd` files, unnumbered early chapters then Parts)
 - `contents/appendix/` — Appendices A-C
 - `data/` — Bundled CSV datasets (`diabetes.csv`, `heart_disease.csv`, `synthetic_notes.csv`)
 - `_plan/` — Book plan and context
 - `_progress/TODOS.md` — Task tracking
+- `_templates/` — Chapter templates:
+  - `programming-chapters.qmd` — for concept-driven chapters (e.g., Ch 03)
+  - `data-analysis-chapters.qmd` — for tool/output-driven chapters (e.g., Ch 04-06)
 
 ## Key Conventions
 
 - **Tidyverse-first**: teach `dplyr`, `ggplot2`, `tidyr`, `readr`
 - **Pipe**: use native `|>` (not `%>%`)
 - **Callouts**: `tip`, `note`, `warning`, `caution` (Python comparisons use collapsible `caution`)
-- **Datasets**: `scurvy` (warm-up), `diabetes` (primary), `heart_disease` (secondary)
+- **Datasets**: `diabetes` (primary throughout Ch 04-06), `heart_disease` (secondary), `scurvy` (warm-up in Ch 04)
 - **Global options**: set in `_quarto.yml` (`execute` + `knitr.opts_chunk`), not `_common.R`
 - **Each chapter** loads its own packages via `library()` explicitly
 
 ## Pedagogical Conventions
 
-See `_templates/programming-chapters.qmd` for a chapter template that implements these.
+Two templates implement these conventions:
+
+- `_templates/programming-chapters.qmd` — concept-driven chapters (variables, types, functions)
+- `_templates/data-analysis-chapters.qmd` — tool/output-driven chapters (data manipulation, visualization, statistics)
 
 ### Teach Before Use
 Never use a concept the reader hasn't seen yet. If a code example requires a concept (operator, syntax, pattern), introduce it in a prior section first. Audit each section for forward-references and add brief introductions where needed.
@@ -43,6 +49,18 @@ When introducing new syntax, break it down piece by piece with a bullet list exp
 
 ### Running Example (Spiral Curriculum)
 Where possible, thread a single domain-relevant example throughout the chapter. Each section applies a new concept to the same scenario, so the example grows in sophistication alongside the reader's knowledge. The example should come from the medical/clinical domain to stay relevant to the audience.
+
+### Interpretation After Output (data analysis chapters)
+After each major output (table, plot, summary), include a brief interpretation paragraph (2-3 sentences). Model the habit of reading results clinically, not just generating them.
+
+### One Tool Per Section (data analysis chapters)
+Each section introduces ONE new tool or concept. Build up within the section: basic form → add one option → full polished example. Sections progress from simple tools to complex ones across the chapter.
+
+### Data Prep Recall (data analysis chapters)
+The first data chapter (Ch 04) teaches import fully. Subsequent chapters replicate the same prep in one compact code chunk with a note: "Everything here was taught in Chapter N." This keeps chapters self-contained without re-teaching.
+
+### Defer Advanced Syntax
+When there's a concise but advanced way to do something (e.g., `across()`, lambda functions), teach the explicit beginner-friendly approach in the main text. Put the advanced shortcut in a collapsed `.callout-tip`.
 
 ## Formatting Conventions
 

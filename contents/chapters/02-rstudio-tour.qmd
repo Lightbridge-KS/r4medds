@@ -189,7 +189,7 @@ There are several ways to run R code. Here are the most common:
 If you remember only one shortcut from this book, make it **Cmd + Enter** (or Ctrl + Enter). You'll use it hundreds of times.
 :::
 
-## Create an RStudio Project
+## Create an RStudio Project {#sec-rstudio-projects}
 
 Before we start coding, let's set up an organized workspace. An RStudio **Project** is a self-contained folder for your work. It automatically sets the **working directory**, so file paths just work.
 

@@ -1,0 +1,340 @@
+---
+# Data Analysis Chapter Template
+# ================================
+# This template captures the pedagogical flow used in Ch 04-06.
+# Use it for chapters that teach data manipulation, visualization,
+# or statistical analysis using a clinical dataset.
+#
+# Compared to `programming-chapters.qmd`:
+#   - Has an explicit Data Preparation block at the top
+#   - Follows a "one tool/concept per section" progression
+#   - Includes Interpretation paragraphs after each analysis
+#   - Ends with a Common Errors table + Summary journey table
+#
+# Instructions:
+#   1. Copy this file to contents/chapters/XX-chapter-name.qmd
+#   2. Replace all [PLACEHOLDERS] with actual content
+#   3. Delete sections that don't apply
+#   4. Remove this YAML comment block
+---
+
+# [Chapter Title]
+
+[1-2 sentence intro: what the reader will learn and why it matters for clinical work.]
+
+[Bridge from previous chapter: "In the previous chapter, we learned X. Now we'll Y — the next step in the workflow."]
+
+```{r}
+#| message: false
+library(tidyverse)
+# [Add chapter-specific packages: gtsummary, ggsci, etc.]
+```
+
+::: {.callout-note}
+## Our running example: [Scenario name]
+
+[Describe a practical clinical scenario using the dataset. Frame it as a
+task the reader might face: "Imagine your colleague asks you to..."
+List 3-4 concrete questions the chapter will answer. Each section should
+address one of these questions.]
+
+- [Question 1]
+- [Question 2]
+- [Question 3]
+- [Question 4]
+:::
+
+
+## Data Preparation
+
+<!-- PATTERN: Compact prep block
+     Ch 04 imports fresh; subsequent chapters replicate the same prep
+     in one code chunk with a brief note referencing prior chapters.
+     This keeps each chapter self-contained while avoiding re-teaching. -->
+
+[For the first data chapter (e.g., Ch 04), this is the full import section.
+For subsequent chapters, condense to a single code chunk:]
+
+We load and prepare the data using tools from [previous chapters]:
+
+```{r}
+[dataset]_raw <- read_csv("[path/to/dataset.csv]", show_col_types = FALSE)
+
+[dataset] <- [dataset]_raw |>
+  clean_names() |>
+  mutate(
+    # [Factor conversion, derived variables, etc.]
+  )
+```
+
+[Brief note: "Everything here — read_csv(), clean_names(), etc. — was taught in Chapter N."]
+
+
+## [Conceptual Framework / Tool Landscape]
+
+<!-- CONVENTION: Classify to Frame
+     Before teaching individual tools, give a bird's-eye overview.
+     Use a summary table to show the landscape of what's available.
+     This gives the reader a mental map before diving into details.
+
+     Examples from existing chapters:
+     - Ch 04: dplyr verbs table (verb | what it does)
+     - Ch 05: Grammar of Graphics table (data | aesthetics | geometry)
+     - Ch 06: Choosing Summary Statistics table (variable type | distribution | statistic) -->
+
+[Brief intro: "Before diving in, here's the big picture of the tools we'll use:"]
+
+| Category | Tool / Concept | What it does |
+|---|---|---|
+| **[Category A]** | `tool_a()` | [description] |
+| **[Category B]** | `tool_b()` | [description] |
+| **[Category C]** | `tool_c()` | [description] |
+
+: [Caption] {.striped}
+
+[Transition: "We'll learn each of these in the sections below, starting with the simplest."]
+
+
+## [Section 1: Simplest Tool / Concept]
+
+<!-- CONVENTION: One concept per section
+     Each section introduces ONE new tool or idea.
+     Start with the simplest possible example, then extend.
+     The progression within a section:
+       1. Basic form (minimal arguments)
+       2. Add one option/customization
+       3. Add another option
+       4. Full polished example -->
+
+### [Basic form]
+
+[Explain what this tool does and when you'd use it.]
+
+```{r}
+# [Simplest possible example — minimal arguments]
+```
+
+### [First extension]
+
+[Add ONE new option or argument. Explain it before using it.]
+
+```{r}
+# [Same example + one new argument]
+```
+
+### [Further extension]
+
+```{r}
+# [More complete example with multiple options]
+```
+
+### Interpretation
+
+<!-- CONVENTION: Interpretation paragraph
+     After each major output (table, plot, or summary), write a brief
+     clinical interpretation. This models the habit of reading output
+     meaningfully rather than just generating it.
+
+     Keep it to 2-3 sentences. Connect the observation to clinical knowledge. -->
+
+[2-3 sentences interpreting the result. What does this tell us clinically?
+Is it expected? Does it raise questions for further analysis?]
+
+
+## [Section 2: Build on Section 1]
+
+<!-- CONVENTION: Incremental Complexity
+     Each new section builds on the previous one.
+     Assume the reader now knows Section 1's tool.
+
+     Within a section, use the same pattern:
+       basic → customized → interpreted
+
+     Examples of incremental progressions:
+     - Ch 04: select → filter → mutate (if_else → case_when) → summarise
+     - Ch 05: histogram → boxplot → scatter → bar chart
+     - Ch 06: single variable → multiple → categorical → grouped → gtsummary -->
+
+### [Simple form with running example]
+
+```{r}
+# [Basic usage on the diabetes data]
+```
+
+### [Extended form]
+
+<!-- CONVENTION: Explain Syntax Explicitly
+     When introducing new syntax, show the general template first,
+     then break it down with a bullet list. -->
+
+The syntax is:
+
+```r
+# [General syntax template — not evaluated]
+```
+
+Let's break this down:
+
+- **`arg1`** --- [what it does]
+- **`arg2`** --- [what it does]
+- **`arg3`** --- [what it does]
+
+```{r}
+# [Applied example with the running dataset]
+```
+
+### Interpretation
+
+[2-3 sentences on what the output reveals clinically.]
+
+::: {.callout-caution collapse="true" title="Python Comparison"}
+[Python equivalent using pandas/seaborn/etc.]
+
+```python
+# Python equivalent
+```
+:::
+
+
+## [Section N: Distinguishing Similar Concepts]
+
+<!-- CONVENTION: Clarify confusing distinctions BEFORE they're needed
+     When two concepts look similar but behave differently,
+     dedicate a callout or mini-section to clarify.
+
+     Examples from existing chapters:
+     - Ch 04: if_else() vs ifelse(), factor() vs fct_relevel()
+     - Ch 05: fill vs color, + vs |>, geom_col() vs geom_bar()
+     - Ch 06: mean+SD vs median+IQR, scale_fill vs scale_color -->
+
+::: {.callout-note}
+## `concept_a()` vs `concept_b()`
+
+- **`concept_a()`** --- [when to use it, what it does]
+- **`concept_b()`** --- [when to use it, how it differs]
+
+[One-line summary of the key distinction.]
+:::
+
+
+## [Optional: Advanced Shortcut in Collapsed Tip]
+
+<!-- CONVENTION: Defer advanced syntax to optional collapsed callouts
+     When there's a more concise/advanced way to do something,
+     show the beginner-friendly approach in the main text and
+     put the advanced version in a collapsed callout-tip.
+
+     Examples from existing chapters:
+     - Ch 06: across() in collapsed tip (column-by-column is primary)
+     - Ch 05: ggsci as an optional section at the end
+     - Ch 04: select helpers in a tip -->
+
+::: {.callout-tip collapse="true"}
+## Shortcut: [Advanced approach name]
+
+[Brief explanation that this is optional and more advanced.]
+
+```{r}
+# [Advanced/concise version]
+```
+
+[Note that the explicit approach above is perfectly fine for most work.]
+:::
+
+
+## [Optional: Putting It All Together]
+
+<!-- CONVENTION: Pipeline integration
+     Near the end, show a multi-step pipeline that combines tools
+     from this chapter (and possibly prior chapters) into a single
+     realistic workflow. This models how real analysis code looks.
+
+     Examples:
+     - Ch 04: filter → mutate → count pipeline
+     - Ch 05: filter → mutate → ggplot() pipeline (dplyr into ggplot2)
+     - Ch 06: gtsummary with all customizations -->
+
+Let's combine what we've learned into one realistic workflow:
+
+```{r}
+# [Multi-step pipeline combining 3+ tools from this chapter]
+```
+
+::: {.callout-tip}
+## The [pattern name] pattern
+
+[Name the workflow pattern. Example: "transform-then-plot",
+"summarise-then-format". This gives readers a mental label
+for how to structure their own analyses.]
+:::
+
+
+## Common Errors and Troubleshooting
+
+<!-- CONVENTION: Error table near the end
+     Every data analysis chapter includes a troubleshooting table
+     with 5-6 common errors specific to this chapter's tools.
+     Format: Error Message | Cause | Fix -->
+
+| Error or Symptom | Cause | Fix |
+|---|---|---|
+| [Error message 1] | [What went wrong] | [How to fix it] |
+| [Error message 2] | [What went wrong] | [How to fix it] |
+| [Error message 3] | [What went wrong] | [How to fix it] |
+| [Error message 4] | [What went wrong] | [How to fix it] |
+| [Error message 5] | [What went wrong] | [How to fix it] |
+
+: Common [topic] errors and their fixes {.striped}
+
+::: {.callout-tip}
+## The debugging habit ([topic] edition)
+
+[3-step debugging checklist specific to this chapter's tools.
+Example for dplyr: "1. Run line by line, 2. Check column names,
+3. Check column types with glimpse()"]
+:::
+
+
+## Summary
+
+<!-- CONVENTION: Journey table
+     Recap the chapter as a step-by-step journey showing how
+     the running example evolved. Each row is a step with:
+     - What we did (action)
+     - The R tool used
+     This mirrors how a real analysis workflow progresses. -->
+
+Here's the journey we took with [the running example]:
+
+| Step | What we did | R tool |
+|---|---|---|
+| [Step 1] | [Action description] | `tool_1()` |
+| [Step 2] | [Action description] | `tool_2()` |
+| [Step 3] | [Action description] | `tool_3()` |
+| [Step N] | [Action description] | `tool_n()` |
+
+: Chapter N journey --- [from X to Y] {.striped}
+
+[Bridge to next chapter: "In the next chapter, we'll move from X to Y — ..."]
+
+
+## Exercises {.unnumbered}
+
+<!-- CONVENTION: 4 exercises using the SAME dataset as the chapter.
+     Progress from simple (one tool) to complex (multi-step pipeline).
+
+     Pattern:
+     1. Simple — apply ONE tool from the chapter
+     2. Moderate — combine 2 tools or add interpretation
+     3. Applied — build a small analysis addressing a clinical question
+     4. Pipeline challenge — combine multiple chapter tools into one workflow
+
+     Each exercise should specify what to compute AND what to interpret. -->
+
+1. **[Simple task name].** [Apply one tool from this chapter. Specify exactly what to compute and from which variables.]
+
+2. **[Moderate task name].** [Combine two tools or concepts. Include a brief interpretation request: "Write 2-3 sentences about what you observe."]
+
+3. **[Applied analysis name].** [A small but complete analysis: prepare data, compute, and interpret. Should feel like a realistic mini-task.]
+
+4. **[Pipeline challenge name].** [Build a multi-step pipeline combining 3+ tools from this chapter. End with: "Read your pipeline aloud — does it make sense?"]

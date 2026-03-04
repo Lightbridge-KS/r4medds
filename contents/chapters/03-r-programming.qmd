@@ -148,7 +148,7 @@ Both R and Python use `snake_case` as the preferred naming convention.
 :::
 
 
-## Data Types
+## Data Types {#sec-data-types}
 
 Every value in R has a **type**. Understanding types helps you avoid errors and work with data correctly.
 
@@ -159,7 +159,7 @@ R has four basic types you'll encounter regularly:
 | `numeric`   | Numbers          | `3.14`, `42`, `-7.5`    |
 | `character` | Text (strings)   | `"hello"`, `"Male"`     |
 | `logical`   | True / False     | `TRUE`, `FALSE`          |
-| `factor`    | Categories       | *(covered in next chapter)* |
+| `factor`    | Categories       | `"G1"`, `"G2"`, `"pos"` |
 
 ### Numeric
 
@@ -210,19 +210,90 @@ class(sex)
 class(is_impaired)
 ```
 
-::: {.callout-note}
-## What about factors?
-A **factor** is a special type for categorical data (like blood group: A, B, AB, O). We'll explore factors in the next chapter when we work with data frames. For now, just know they exist.
+### Factor {#sec-factors}
+
+A **factor** is R's type for **categorical data** --- variables with a fixed set of allowed values. Think of blood group (A, B, AB, O), treatment arm (placebo, drug), or CKD stage (G1, G2, G3, G4-G5).
+
+A factor looks like a character variable, but it carries a defined set of **levels** --- the allowed categories and their order:
+
+```{r}
+# A character vector — just text
+ckd_chr <- c("G2", "G1", "G3", "G2", "G1")
+class(ckd_chr)
+```
+
+```{r}
+# A factor — text with defined levels
+ckd_fct <- factor(ckd_chr)
+ckd_fct
+class(ckd_fct)
+```
+
+Notice the `Levels:` line --- R now knows the allowed categories. By default, `factor()` sorts levels **alphabetically** (G1, G2, G3).
+
+#### Creating factors with `factor()`
+
+The `factor()` function converts a character vector into a factor. You can explicitly set the order of levels with the `levels` argument:
+
+```r
+factor(x, levels = c("level1", "level2", "level3"))
+```
+
+Let's break this down:
+
+- **`x`** --- the character vector to convert
+- **`levels`** --- a character vector specifying the allowed values **and their order**. The first level is treated as the "reference" in statistical models.
+
+Let's use this with our CKD stages, where the clinical order matters:
+
+```{r}
+# Without explicit levels — alphabetical order (happens to be correct here)
+factor(c("G2", "G1", "G3"))
+```
+
+```{r}
+# With explicit levels — we control the order
+ckd_stages <- factor(
+  c("G2", "G1", "G3"),
+  levels = c("G1", "G2", "G3", "G4-G5")
+)
+ckd_stages
+```
+
+Notice that `G4-G5` appears in the levels even though no patient has that stage. That's the power of factors --- they define **all possible categories**, not just the ones present in your data.
+
+::: {.callout-warning}
+## Character looks like factor but behaves differently
+
+A character `"G2"` and a factor `"G2"` print the same way, but R treats them differently:
+
+- **Character**: just text, no defined set of categories
+- **Factor**: text with a fixed set of levels and an order
+
+When you see unexpected ordering in plots or tables, check whether your variable is a factor with `class()`.
+:::
+
+::: {.callout-tip}
+## Why level order matters
+
+Level order controls:
+
+- **Plot axis/legend order** --- categories appear in level order on charts
+- **Table row order** --- summary tables follow level order
+- **Statistical reference category** --- the first level is the baseline in regression models
+
+Getting the order right early saves headaches later. In the next chapter, you'll learn `fct_relevel()` --- a tidyverse tool to reorder levels conveniently.
 :::
 
 ::: {.callout-caution collapse="true" title="Python Comparison"}
-Python's type names differ slightly:
+Python's type names differ slightly from R:
 
-| R           | Python        | Example          |
-|-------------|---------------|------------------|
-| `numeric`   | `int`/`float` | `42`, `3.14`     |
-| `character` | `str`         | `"hello"`        |
-| `logical`   | `bool`        | `True`, `False`  |
+| R           | Python                | Example          |
+|-------------|-----------------------|------------------|
+| `numeric`   | `int`/`float`         | `42`, `3.14`     |
+| `character` | `str`                 | `"hello"`        |
+| `logical`   | `bool`                | `True`, `False`  |
+| `factor`    | `pd.Categorical`      | ordered categories |
 
 Note: Python booleans are capitalized (`True`/`False`) but not all-caps like R's `TRUE`/`FALSE`.
 
@@ -230,11 +301,19 @@ Note: Python booleans are capitalized (`True`/`False`) but not all-caps like R's
 type(42)       # <class 'int'>
 type("Male")   # <class 'str'>
 type(True)     # <class 'bool'>
+
+# Factors equivalent in pandas:
+import pandas as pd
+ckd = pd.Categorical(
+    ["G2", "G1", "G3"],
+    categories=["G1", "G2", "G3", "G4-G5"],
+    ordered=True
+)
 ```
 :::
 
 
-## Vectors
+## Vectors {#sec-vectors}
 
 A **vector** is R's fundamental data structure --- an ordered collection of values of the same type. Almost everything in R is a vector; even a single number like `42` is a vector of length 1.
 
@@ -352,7 +431,7 @@ Key difference: **R is 1-based** (`ages[1]` is the first), **Python is 0-based**
 :::
 
 
-## Logical Operations and Comparisons
+## Logical Operations and Comparisons {#sec-logical-ops}
 
 Comparisons produce logical values (`TRUE` / `FALSE`). These are essential for filtering and classifying data.
 
@@ -1026,6 +1105,7 @@ In this chapter, you've learned the core building blocks of R programming. Here'
 | Start   | `(140 - 55) * 70 / (72 * 1.2)`          | Arithmetic operators  |
 | Store   | `age`, `weight_kg`, `creatinine`         | Variables             |
 | Verify  | `typeof()`, `class()`                    | Data types            |
+| Categorize | CKD stages as `factor()`              | Factors               |
 | Scale   | 5 patients at once                       | Vectors               |
 | Filter  | `egfrs < 60`                             | Logical comparisons   |
 | Handle  | Missing creatinine                       | `NA` and `na.rm`      |
