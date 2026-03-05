@@ -1,0 +1,17 @@
+---
+title: "Inferential Stats"
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_knit$set(root.dir = rprojroot::find_rstudio_root_file())
+here::i_am("_explore/notebooks/inferential-stats-explore.qmd")
+library(here)
+library(tidyverse)
+```
+
+
+```{r}
+Orange %>% count(Tree)
+```
+
