@@ -150,20 +150,31 @@ Both R and Python use `snake_case` as the preferred naming convention.
 
 ## Data Types {#sec-data-types}
 
-Every value in R has a **type**. Understanding types helps you avoid errors and work with data correctly.
+Every value in R is stored as a **vector** --- an ordered collection of elements. Even a single number like `42` is a vector of length 1. Understanding what types of data these vectors can hold is essential for working with R effectively.
 
-R has four basic types you'll encounter regularly:
+R has six basic data types you'll encounter:
 
-| Type        | Stores           | Examples                 |
-|-------------|------------------|--------------------------|
-| `numeric`   | Numbers          | `3.14`, `42`, `-7.5`    |
-| `character` | Text (strings)   | `"hello"`, `"Male"`     |
-| `logical`   | True / False     | `TRUE`, `FALSE`          |
-| `factor`    | Categories       | `"G1"`, `"G2"`, `"pos"` |
+| Type        | Stores                | Example                          |
+|-------------|-----------------------|----------------------------------|
+| `double`    | Decimal numbers       | `3.14`, `42`, `-7.5`            |
+| `integer`   | Whole numbers         | `1L`, `55L`, `100L`             |
+| `character` | Text (strings)        | `"hello"`, `"Male"`             |
+| `logical`   | True / False          | `TRUE`, `FALSE`                  |
+| `list`      | Mixed-type collection | `list("John", 55, TRUE)`        |
+| `factor`    | Categories            | `factor(c("G1", "G2", "G3"))`   |
 
-### Numeric
+The first four are **atomic** types --- they can only hold one kind of data. Lists and factors are built on top of them.
 
-Numbers are the most common type. R stores most numbers as **doubles** (decimal numbers):
+
+### Atomic Vectors {#sec-vectors}
+
+An **atomic vector** holds a sequence of values that are all the **same type**. When you create a variable in R, you're creating an atomic vector --- even if it contains only one value.
+
+#### Doubles and integers
+
+R has two numeric types: **doubles** (decimal numbers) and **integers** (whole numbers).
+
+Most numbers in R are stored as doubles by default:
 
 ```{r}
 typeof(age)
@@ -173,9 +184,32 @@ typeof(age)
 typeof(creatinine)
 ```
 
-Even `55` (a whole number) is stored as a double internally.
+Even `55` --- a whole number --- is stored as a double internally. To explicitly create an integer, append `L` (for **L**ong integer):
 
-### Character
+```{r}
+patient_count <- 55L
+typeof(patient_count)
+```
+
+In practice, the distinction rarely matters because both are "numeric":
+
+```{r}
+is.numeric(age)            # double — numeric
+is.numeric(patient_count)  # integer — also numeric
+```
+
+::: {.callout-note collapse="true"}
+## When does double vs integer matter?
+
+For most data analysis, you can treat doubles and integers interchangeably --- R converts between them automatically. The distinction matters mainly in:
+
+- **Memory-sensitive** work with very large datasets (integers use half the memory)
+- **Package APIs** that expect a specific type (rare)
+
+When in doubt, just use regular numbers (doubles). R will handle the rest.
+:::
+
+#### Characters
 
 Text values are called **character** strings. They must be wrapped in quotes (`"` or `'`):
 
@@ -185,7 +219,7 @@ diagnosis <- "Chronic Kidney Disease"
 typeof(sex)
 ```
 
-### Logical
+#### Logicals
 
 Logical values are either `TRUE` or `FALSE`. They often come from comparisons:
 
@@ -200,9 +234,12 @@ typeof(is_impaired)
 
 Our patient's eGFR of ~69 is not below 60, so `is_impaired` is `FALSE`.
 
-### Checking types
+#### Checking types
 
-Use `class()` for a quick type check:
+R provides two functions for checking types:
+
+- **`typeof()`** --- returns the internal storage type (e.g., `"double"`, `"character"`)
+- **`class()`** --- returns the higher-level type (e.g., `"numeric"`, `"factor"`)
 
 ```{r}
 class(age)
@@ -210,11 +247,200 @@ class(sex)
 class(is_impaired)
 ```
 
-### Factor {#sec-factors}
+For atomic vectors, `class()` is usually what you want --- it tells you how R will *treat* the value.
+
+#### Creating vectors
+
+So far, each variable has held a single value. To store multiple values, use `c()` (short for **c**ombine):
+
+```{r}
+ages <- c(55, 70, 45, 62, 38)
+ages
+```
+
+```{r}
+sexes <- c("Male", "Female", "Male", "Female", "Male")
+sexes
+```
+
+The **`:`** operator creates a sequence of integers --- useful for generating regular number sequences without typing each one:
+
+```{r}
+1:5
+```
+
+```{r}
+10:15
+```
+
+#### Coercion
+
+All elements of an atomic vector must be the **same type**. If you mix types, R automatically **coerces** (converts) them to the most flexible type:
+
+```{r}
+mixed <- c(1, "two", TRUE)
+mixed
+typeof(mixed)
+```
+
+Everything became a character string! R follows a coercion hierarchy:
+
+```
+logical → integer → double → character
+```
+
+Each type can be converted to the types to its right, but not the other way without explicit conversion. This is a common source of surprises --- if your "numbers" are behaving oddly, check whether a stray character value coerced the entire vector to character.
+
+#### Indexing and subsetting
+
+Access elements by position using square brackets `[]`. **R uses 1-based indexing** --- the first element is `[1]`:
+
+```{r}
+ages[1]      # first patient
+```
+
+```{r}
+ages[2:4]    # patients 2 through 4
+```
+
+```{r}
+ages[-1]     # all EXCEPT the first
+```
+
+#### Vectorized operations --- R's superpower
+
+This is one of R's most powerful features: operations apply to **every element at once**, without needing a loop.
+
+```{r}
+ages + 10    # add 10 to every age
+```
+
+Let's use this to compute eGFR for five patients simultaneously:
+
+```{r}
+# Five clinic patients
+ages         <- c(55, 70, 45, 62, 38)
+weights      <- c(70, 58, 82, 65, 90)
+creatinines  <- c(1.2, 1.8, 0.9, 2.1, 1.0)
+```
+
+```{r}
+# Calculate eGFR for ALL patients at once (without sex adjustment for now)
+egfrs <- (140 - ages) * weights / (72 * creatinines)
+egfrs
+```
+
+One line of code --- five eGFR results. No loops needed. We'll add the sex adjustment factor later when we learn about functions.
+
+::: {.callout-tip}
+## Why vectorization matters
+In many languages, you'd write a `for` loop to process each patient one at a time. R's vectorized operations are not only more concise --- they're also **faster**, because R optimizes the computation internally.
+:::
+
+#### Summary functions
+
+R provides built-in functions to summarize vectors:
+
+```{r}
+mean(egfrs)      # average eGFR
+```
+
+```{r}
+median(egfrs)
+```
+
+```{r}
+min(egfrs)
+max(egfrs)
+```
+
+```{r}
+length(egfrs)    # how many patients
+```
+
+```{r}
+round(egfrs, 1)  # round to 1 decimal place
+```
+
+
+### Lists
+
+Atomic vectors require all elements to be the same type. A **list** removes that restriction --- it can hold elements of **different types**, including other vectors and even other lists.
+
+Think of a list like a **patient record**: it bundles a name (character), an age (numeric), and a set of lab results (numeric vector) into one object.
+
+```{r}
+patient <- list(
+  name = "Somchai",
+  age  = 55,
+  labs = c(1.2, 98, 5.4)
+)
+patient
+```
+
+#### Accessing list elements
+
+Use **`$`** to access a named element, or **`[[]]`** to access by name or position:
+
+```{r}
+patient$name
+```
+
+```{r}
+patient[["age"]]
+```
+
+```{r}
+patient[[3]]     # third element (labs)
+```
+
+::: {.callout-warning}
+## `[]` vs `[[]]` for lists
+
+- **`patient[1]`** (single brackets) returns a **smaller list** containing the first element
+- **`patient[[1]]`** (double brackets) extracts the **element itself**
+
+Think of single brackets as taking a slice of the container, and double brackets as reaching inside to pull out the contents.
+:::
+
+#### Inspecting lists with `str()`
+
+For complex lists, `str()` (short for **str**ucture) gives a compact overview:
+
+```{r}
+str(patient)
+```
+
+This shows the type and first few values of each element --- very useful for understanding unfamiliar objects.
+
+::: {.callout-note}
+## Lists as function output
+
+Many R functions return lists. For example, `t.test()` returns a list containing the test statistic, p-value, confidence interval, and more. You'll see this in action when we cover inferential statistics later in the book.
+:::
+
+
+### Attributes and Factors {#sec-factors}
+
+R objects can carry **attributes** --- metadata attached to a vector. You've already seen one attribute implicitly: when you name elements in a list, those names are an attribute.
+
+Two common attributes are:
+
+- **`names`** --- labels for each element
+- **`class`** --- tells R how to treat the object (e.g., as a factor, a date, or a data frame)
+
+```{r}
+labs <- c(creatinine = 1.2, glucose = 98, potassium = 5.4)
+attributes(labs)
+```
+
+The most important use of attributes in everyday R is the **factor** --- a vector with `levels` and `class` attributes that make it behave as categorical data.
+
+#### Factors
 
 A **factor** is R's type for **categorical data** --- variables with a fixed set of allowed values. Think of blood group (A, B, AB, O), treatment arm (placebo, drug), or CKD stage (G1, G2, G3, G4-G5).
 
-A factor looks like a character variable, but it carries a defined set of **levels** --- the allowed categories and their order:
+Under the hood, a factor is an **integer vector** with two extra attributes: `levels` (the allowed categories) and `class` (set to `"factor"`). It *looks* like text, but R stores it as numbers with labels.
 
 ```{r}
 # A character vector — just text
@@ -262,6 +488,12 @@ ckd_stages
 
 Notice that `G4-G5` appears in the levels even though no patient has that stage. That's the power of factors --- they define **all possible categories**, not just the ones present in your data.
 
+We can verify the attributes that make a factor work:
+
+```{r}
+attributes(ckd_stages)
+```
+
 ::: {.callout-warning}
 ## Character looks like factor but behaves differently
 
@@ -286,134 +518,20 @@ Getting the order right early saves headaches later. In the next chapter, you'll
 :::
 
 ::: {.callout-caution collapse="true" title="Python Comparison"}
-Python's type names differ slightly from R:
+Python's type system differs from R in several ways:
+
+**Atomic types:**
 
 | R           | Python                | Example          |
 |-------------|-----------------------|------------------|
-| `numeric`   | `int`/`float`         | `42`, `3.14`     |
+| `double`    | `float`               | `3.14`           |
+| `integer`   | `int`                 | `42`             |
 | `character` | `str`                 | `"hello"`        |
 | `logical`   | `bool`                | `True`, `False`  |
-| `factor`    | `pd.Categorical`      | ordered categories |
 
 Note: Python booleans are capitalized (`True`/`False`) but not all-caps like R's `TRUE`/`FALSE`.
 
-```python
-type(42)       # <class 'int'>
-type("Male")   # <class 'str'>
-type(True)     # <class 'bool'>
-
-# Factors equivalent in pandas:
-import pandas as pd
-ckd = pd.Categorical(
-    ["G2", "G1", "G3"],
-    categories=["G1", "G2", "G3", "G4-G5"],
-    ordered=True
-)
-```
-:::
-
-
-## Vectors {#sec-vectors}
-
-A **vector** is R's fundamental data structure --- an ordered collection of values of the same type. Almost everything in R is a vector; even a single number like `42` is a vector of length 1.
-
-### Creating vectors
-
-Use `c()` (short for **c**ombine) to create a vector:
-
-```{r}
-ages <- c(55, 70, 45, 62, 38)
-ages
-```
-
-```{r}
-sexes <- c("Male", "Female", "Male", "Female", "Male")
-sexes
-```
-
-The **`:`** operator creates a sequence of integers --- useful for generating regular number sequences without typing each one:
-
-```{r}
-1:5
-```
-
-```{r}
-10:15
-```
-
-### Indexing or Subsetting
-
-Access elements by position using square brackets `[]`. **R uses 1-based indexing** --- the first element is `[1]`:
-
-```{r}
-ages[1]      # first patient
-```
-
-```{r}
-ages[2:4]    # patients 2 through 4
-```
-
-```{r}
-ages[-1]     # all EXCEPT the first
-```
-
-### Vectorized operations --- R's superpower
-
-This is one of R's most powerful features: operations apply to **every element at once**, without needing a loop.
-
-```{r}
-ages + 10    # add 10 to every age
-```
-
-Let's use this to compute eGFR for five patients simultaneously:
-
-```{r}
-# Five clinic patients
-ages         <- c(55, 70, 45, 62, 38)
-weights      <- c(70, 58, 82, 65, 90)
-creatinines  <- c(1.2, 1.8, 0.9, 2.1, 1.0)
-```
-
-```{r}
-# Calculate eGFR for ALL patients at once (without sex adjustment for now)
-egfrs <- (140 - ages) * weights / (72 * creatinines)
-egfrs
-```
-
-One line of code --- five eGFR results. No loops needed. We'll add the sex adjustment factor later when we learn about functions.
-
-::: {.callout-tip}
-## Why vectorization matters
-In many languages, you'd write a `for` loop to process each patient one at a time. R's vectorized operations are not only more concise --- they're also **faster**, because R optimizes the computation internally.
-:::
-
-### Summary functions
-
-R provides built-in functions to summarize vectors:
-
-```{r}
-mean(egfrs)      # average eGFR
-```
-
-```{r}
-median(egfrs)
-```
-
-```{r}
-min(egfrs)
-max(egfrs)
-```
-
-```{r}
-length(egfrs)    # how many patients
-```
-
-```{r}
-round(egfrs, 1)  # round to 1 decimal place
-```
-
-::: {.callout-caution collapse="true" title="Python Comparison"}
-R vectors and Python lists look similar but behave differently:
+**Vectors and lists:**
 
 ```python
 # Python list — NOT vectorized by default
@@ -428,6 +546,18 @@ ages + 10        # array([65, 80, 55, 72, 48])
 ```
 
 Key difference: **R is 1-based** (`ages[1]` is the first), **Python is 0-based** (`ages[0]` is the first).
+
+**Factors:**
+
+```python
+# Factors equivalent in pandas:
+import pandas as pd
+ckd = pd.Categorical(
+    ["G2", "G1", "G3"],
+    categories=["G1", "G2", "G3", "G4-G5"],
+    ordered=True
+)
+```
 :::
 
 
